@@ -1,0 +1,42 @@
+# Ortak proje dosyaları ve klasörleri
+.idea/             # IntelliJ IDEA ayarları
+.vscode/           # VS Code ayarları
+*.iml              # IntelliJ IDEA modül dosyaları
+*.ipr
+*.iws
+/.classpath        # Eclipse ayarları
+/.project
+/.settings
+.DS_Store          # macOS özel dosyaları
+tmp/               # Geçici klasörler
+*.log              # Log dosyaları
+
+# Spring Boot (backend) özel dosyaları ve klasörleri
+/digitalcard-backend/target/           # Maven'ın derlenmiş çıktısı
+/digitalcard-backend/.gradle/          # Gradle ayarları (eğer Gradle kullanıyorsanız)
+/digitalcard-backend/build/            # Gradle'ın derlenmiş çıktısı (eğer Gradle kullanıyorsanız)
+/digitalcard-backend/.mvn/wrapper/maven-wrapper.jar # Maven wrapper'ının jar dosyası
+
+# Spring Boot'ta hassas bilgiler (ÇOK ÖNEMLİ!)
+/digitalcard-backend/src/main/resources/application.properties  # Eğer hassas bilgiler içeriyorsa
+/digitalcard-backend/src/main/resources/application-*.properties # Ortama özel hassas bilgiler
+/digitalcard-backend/src/main/resources/application.yml        # YAML kullanıyorsanız
+/digitalcard-backend/src/main/resources/application-*.yml
+
+# NOT: Eğer yukarıdaki .properties veya .yml dosyalarını .gitignore'a eklerseniz,
+# projenizi klonlayan kişiler için örnek bir dosya sağlamanız gerekir.
+# Örneğin: application.properties.example veya application-dev.properties.example
+# Bu dosyalara dummy (sahte) veya varsayılan değerler koyarsınız.
+
+# Angular (frontend) özel dosyaları ve klasörleri
+/digitalcard-frontend/node_modules/    # NPM bağımlılıkları
+/digitalcard-frontend/dist/            # Angular derlenmiş çıktısı
+/digitalcard-frontend/.angular/cache/  # Angular CLI önbelleği
+/digitalcard-frontend/tmp/             # Geçici klasörler
+/digitalcard-frontend/*.log            # Log dosyaları
+/digitalcard-frontend/.env             # Frontend için çevre değişkenleri (eğer kullanıyorsanız)
+
+# Veritabanı ile ilgili dosyalar (eğer proje klasörünüzde tutuyorsanız)
+*.sql              # SQL dump veya script dosyaları
+*.bak
+*.dump
