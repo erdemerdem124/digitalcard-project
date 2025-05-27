@@ -1,0 +1,109 @@
+<div class="home-container">
+  <header class="app-header">
+    <div class="logo">Dijital Kartım</div>
+    <nav class="main-nav">
+      <ul>
+        <li><a routerLink="/home">Kartım</a></li>
+        <li *ngIf="currentUserUsername">
+          <a [routerLink]="'/profile/edit/' + currentUserUsername">Profili Düzenle</a>
+        </li>
+      </ul>
+    </nav>
+    <button (click)="logout()" class="logout-button">
+      <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+    </button>
+  </header>
+
+  <main class="main-content">
+    <div *ngIf="isLoading" class="loading-spinner">
+      <i class="fas fa-spinner fa-spin"></i> Profil yükleniyor...
+    </div>
+
+    <div *ngIf="errorMessage" class="alert alert-danger">
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+    </div>
+
+    <ng-container *ngIf="!isLoading && userProfile as profile">
+      <div class="profile-card">
+        <div class="profile-header">
+          <img [src]="profile.profileImageUrl || 'assets/default-profile.png'" alt="Profil Resmi" class="profile-image" />
+          <div class="profile-info-basic">
+            <h1 class="profile-name">{{ profile.firstName }} {{ profile.lastName }}</h1>
+            <p class="profile-username">&#64;{{ profile.username }}</p>
+            <p class="profile-title" *ngIf="profile.title">{{ profile.title }}</p>
+            <p class="profile-location" *ngIf="profile.location">
+              <i class="fas fa-map-marker-alt"></i> {{ profile.location }}
+            </p>
+            <p class="profile-email" *ngIf="profile.email">
+              <i class="fas fa-envelope"></i> {{ profile.email }}
+            </p>
+            <p class="profile-phone" *ngIf="profile.phone">
+              <i class="fas fa-phone-alt"></i> {{ profile.phone }}
+            </p>
+            <p class="profile-portfolio" *ngIf="profile.portfolioUrl">
+              <i class="fas fa-globe"></i>
+              <a [href]="profile.portfolioUrl" target="_blank">{{ profile.portfolioUrl }}</a>
+            </p>
+          </div>
+        </div>
+
+        <div class="profile-bio" *ngIf="profile.bio">
+          <p>{{ profile.bio }}</p>
+        </div>
+
+        <div class="profile-section" *ngIf="isNonEmptyArray(profile.socialLinks)">
+          <h2><i class="fas fa-share-alt"></i> Sosyal Medya</h2>
+          <div class="social-links-grid">
+            <a *ngFor="let link of profile.socialLinks" [href]="link.url" target="_blank" class="social-link-item">
+              <i [class]="getSocialIcon(link.platform)"></i> {{ link.platform }}
+            </a>
+          </div>
+        </div>
+
+        <div
+          class="profile-section contact-section"
+          *ngIf="profile.phone || profile.email || isNonEmptyArray(profile.socialLinks)"
+        >
+          <h2><i class="fas fa-handshake"></i> Bana Ulaş</h2>
+          <div class="contact-buttons-grid">
+            <a *ngIf="profile.phone" [href]="'tel:' + profile.phone" class="contact-button phone-button">
+              <i class="fas fa-phone-alt"></i> Ara
+            </a>
+            <a *ngIf="profile.email" [href]="'mailto:' + profile.email" class="contact-button email-button">
+              <i class="fas fa-envelope"></i> E-posta Gönder
+            </a>
+          </div>
+        </div>
+
+        <div class="profile-section" *ngIf="isNonEmptyArray(profile.projects)">
+          <h2><i class="fas fa-folder-open"></i> Projeler</h2>
+          <div class="projects-list">
+            <div *ngFor="let project of profile.projects" class="project-item">
+              <h3>{{ project.title }}</h3>
+              <p *ngIf="project.description">{{ project.description }}</p>
+              <p class="project-tech" *ngIf="project.technologies">
+                <i class="fas fa-code"></i> {{ project.technologies }}
+              </p>
+              <a *ngIf="project.projectUrl" [href]="project.projectUrl" target="_blank" class="project-url">
+                <i class="fas fa-external-link-alt"></i> Projeyi Görüntüle
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button class="edit-button" *ngIf="currentUserUsername" [routerLink]="'/profile/edit/' + currentUserUsername">
+            <i class="fas fa-edit"></i> Kartı Düzenle
+          </button>
+        </div>
+      </div>
+    </ng-container>
+
+    <div *ngIf="!isLoading && !userProfile && !errorMessage" class="no-profile-message">
+      <p>Profiliniz henüz oluşturulmamış veya bulunamadı.</p>
+      <button class="create-profile-button" *ngIf="currentUserUsername" [routerLink]="'/profile/edit/' + currentUserUsername">
+        <i class="fas fa-user-plus"></i> Profilinizi Oluşturun
+      </button>
+    </div>
+  </main>
+</div>

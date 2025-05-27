@@ -1,0 +1,68 @@
+/* src/app/components/toast/toast.component.scss */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none; /* Allows clicks to pass through if no toast is active */
+}
+
+.toast-message {
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #fff;
+  min-width: 250px;
+  max-width: 350px;
+  pointer-events: all; /* Make the toast itself clickable/interactable */
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.toast-message.success {
+  background-color: #28a745; /* Green */
+}
+
+.toast-message.error {
+  background-color: #dc3545; /* Red */
+}
+
+.toast-message.info {
+  background-color: #007bff; /* Blue */
+}
+
+.toast-text {
+  flex-grow: 1;
+  margin-right: 15px;
+}
+
+.toast-close-button {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 5px;
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

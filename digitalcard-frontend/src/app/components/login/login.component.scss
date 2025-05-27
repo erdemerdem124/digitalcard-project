@@ -1,0 +1,18 @@
+/* src/app/components/login/login.component.scss */
+
+/* auth-container stilleri styles.scss'ten geliyor */
+
+/* Sadece bu bileşene özgü küçük ayarlamalar */
+h1 {
+  margin-bottom: var(--spacing-xl);
+  font-size: var(--font-size-lg);
+  color: var(--primary-color);
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545; /* Kırmızı border */
+}
+
+.mt-3 {
+  margin-top: var(--spacing-md); /* Yukarı boşluk */
+}

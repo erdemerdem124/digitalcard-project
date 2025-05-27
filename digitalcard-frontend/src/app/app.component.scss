@@ -1,0 +1,24 @@
+/* src/app/app.component.scss */
+/* Genel stiller ve resetlemeler */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden; /* Yatay kaydırmayı engelle */
+  font-family: 'Arial', sans-serif;
+  box-sizing: border-box;
+  background-color: #f0f2f5; /* Varsayılan arka plan rengi */
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+.app-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh; /* Ekranın tamamını kapla */
+  width: 100vw; /* Ekran genişliğinin tamamını kapla */
+}

@@ -1,0 +1,256 @@
+/* src/styles.scss */
+
+/* Google Fonts - Kullanıcı arayüzünüz için modern bir font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Değişkenler (Renkler, Font Boyutları vb.) */
+:root {
+  /* Renk Paleti */
+  --primary-color: #007bff; // Ana düğmeler, vurgular
+  --secondary-color: #6c757d; // İkincil düğmeler, gri tonlar
+  --accent-color: #28a745; // Başarılı işlemler, yeşil vurgu
+  --accent-color-dark: #218838; // <-- BU SATIRIN OLDUĞUNDAN EMİN OLUN! Accent renginin biraz daha koyu hali (Manuel olarak belirlendi)
+  --background-color: #f8f9fa; // Genel arka plan
+  --card-background-color: #ffffff; // Kart ve kutu arka planları
+  --text-color-dark: #343a40; // Koyu metin
+  --text-color-light: #f8f9fa; // Açık metin (örneğin buton yazıları)
+  --border-color: #dee2e6; // Sınırlar, çizgiler
+  --shadow-color: rgba(0, 0, 0, 0.1); // Gölgeler
+
+  /* Tipografi */
+  --font-family-primary: 'Poppins', sans-serif;
+  --font-size-base: 1rem; // 16px
+  --font-size-sm: 0.875rem; // 14px
+  --font-size-lg: 1.25rem; // 20px
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Boşluklar */
+  --spacing-xs: 0.25rem; // 4px
+  --spacing-sm: 0.5rem; // 8px
+  --spacing-md: 1rem; // 16px
+  --spacing-lg: 1.5rem; // 24px
+  --spacing-xl: 2rem; // 32px
+}
+
+/* Genel Sıfırlamalar ve Temel Stiller */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: var(--text-color-dark);
+  background-color: var(--background-color);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center; // Sayfayı ortala
+  justify-content: center; // Sayfayı dikeyde ortala
+  overflow-x: hidden; // Yatay kaydırmayı engelle
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-color-dark);
+}
+
+p {
+  margin-bottom: var(--spacing-sm);
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+ul {
+  list-style: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: 5px;
+  font-weight: var(--font-weight-medium);
+  transition: all 0.3s ease;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &.primary-button {
+    background-color: var(--primary-color);
+    color: var(--text-color-light);
+  }
+
+  &.secondary-button {
+    background-color: var(--secondary-color);
+    color: var(--text-color-light);
+  }
+
+  &.accent-button {
+    background-color: var(--accent-color);
+    color: var(--text-color-light);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+/* Form Elemanları Temel Stilleri */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-family: var(--font-family-primary);
+  font-size: var(--font-size-base);
+  color: var(--text-color-dark);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+
+  &:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  }
+}
+
+.form-group {
+  margin-bottom: var(--spacing-md);
+
+  label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-color-dark);
+  }
+}
+
+.alert-danger, .error-message {
+  color: #dc3545; // Kırmızı hata rengi
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.success-message {
+  color: #28a745; // Yeşil başarılı rengi
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-xs);
+}
+
+/* Flexbox yardımcı sınıfları */
+.d-flex { display: flex; }
+.justify-content-center { justify-content: center; }
+.align-items-center { align-items: center; }
+
+/* Global Container (Auth sayfaları ve Home sayfası için) */
+.auth-container, .home-page-container {
+  width: 100%;
+  max-width: 450px; /* Auth için dar, Home için daha genişletilebilir */
+  padding: var(--spacing-xl);
+  background-color: var(--card-background-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px var(--shadow-color);
+  text-align: center;
+  margin: var(--spacing-xl) auto; /* Merkezi hizalama ve üst/alt boşluk */
+
+  @media (max-width: 768px) {
+    max-width: 90%; /* Mobil cihazlarda daha geniş */
+    padding: var(--spacing-lg);
+    margin: var(--spacing-lg) auto;
+  }
+}
+
+/* Sayfa üstü başlık */
+.app-header {
+  width: 100%;
+  background-color: var(--primary-color);
+  color: var(--text-color-light);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px var(--shadow-color);
+  position: fixed; /* Üstte sabit header */
+  top: 0;
+  left: 0;
+  z-index: 1000; /* Diğer elementlerin üzerinde olması için */
+
+  .logo {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .main-nav ul {
+    display: flex;
+    gap: var(--spacing-xl); // Navigasyon linkleri arası boşluk
+
+    li a {
+      color: var(--text-color-light);
+      font-weight: var(--font-weight-medium);
+      padding: var(--spacing-xs) 0;
+      transition: border-bottom 0.3s ease;
+      &:hover {
+        text-decoration: none;
+        border-bottom: 2px solid var(--text-color-light);
+      }
+    }
+  }
+
+  .logout-button {
+    background-color: var(--accent-color);
+    color: var(--text-color-light);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 5px;
+    font-size: var(--font-size-sm);
+
+    &:hover {
+      background-color: var(--accent-color-dark); // <-- BURADA KULLANIYORUZ
+    }
+  }
+
+  /* Mobil uyumluluk için header */
+  @media (max-width: 768px) {
+    flex-direction: column;
+    padding: var(--spacing-md);
+
+    .logo {
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .main-nav {
+      width: 100%;
+      ul {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-sm);
+      }
+    }
+  }
+}
+
+/* Home sayfasına header'dan dolayı üst boşluk */
+app-home {
+  margin-top: 80px; /* Header yüksekliğine göre ayarlayın */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* İçeriğin üstten başlaması için */
+}
