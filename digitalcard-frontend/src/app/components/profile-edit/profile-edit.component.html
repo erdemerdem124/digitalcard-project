@@ -1,154 +1,219 @@
-<div class="profile-edit-container">
-  <header class="app-header">
-    <div class="logo">Dijital Kartım</div>
+<!-- src/app/components/profile-edit/profile-edit.component.html -->
+<div class="main-container">
+  <!-- Tema Değiştirme Anahtarı -->
+  <div class="theme-toggle-container">
+    <label class="theme-toggle-switch">
+      <input type="checkbox" (change)="toggleTheme()" [checked]="currentTheme === Theme.Dark">
+      <span class="slider round"></span>
+    </label>
+  </div>
+
+  <!-- Header/Navigasyon Bölümü -->
+  <header class="header-section">
     <nav class="main-nav">
-      <ul>
-        <li><a routerLink="/home">Kartım</a></li>
-        <li *ngIf="currentUsername"><a routerLink="/profile/edit/{{currentUsername}}">Profili Düzenle</a></li>
-      </ul>
+      <div class="nav-links">
+        <a [routerLink]="'/home'" class="nav-item">
+          <i class="fas fa-id-card"></i> Dijital Kartım
+        </a>
+        <a [routerLink]="'/my-card'" class="nav-item">
+          <i class="fas fa-qrcode"></i> Kartım
+        </a>
+        <a [routerLink]="profileEditUrl" class="nav-item">
+          <i class="fas fa-edit"></i> Profili Düzenle
+        </a>
+      </div>
+      <button (click)="logout()" class="logout-button">
+        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+      </button>
     </nav>
-    <button (click)="logout()" class="logout-button">Çıkış Yap</button>
   </header>
 
-  <main class="profile-edit-content">
+  <!-- Ana İçerik Alanı -->
+  <main class="main-content">
     <div *ngIf="isLoading" class="loading-spinner">
       <i class="fas fa-spinner fa-spin"></i> Profil yükleniyor...
     </div>
 
-    <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" *ngIf="!isLoading && currentUserProfile">
-      <h2>Profilinizi Düzenleyin</h2>
+    <div *ngIf="errorMessage" class="alert alert-danger">
+      <i class="fas fa-exclamation-triangle"></i> {{ errorMessage }}
+    </div>
 
-      <section class="form-section">
-        <h3>Temel Bilgiler</h3>
-        <div class="form-group">
-          <label for="firstName">Adınız</label>
-          <input type="text" id="firstName" formControlName="firstName" class="form-control">
-          <div *ngIf="profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched" class="error-message">
-            Adınız zorunludur.
+    <div *ngIf="!isLoading" class="profile-edit-card card-section">
+      <h1 class="edit-title"><i class="fas fa-user-edit"></i> Profilini Düzenle</h1>
+
+      <form [formGroup]="profileForm" (ngSubmit)="onSubmit()">
+        <!-- Profil Resmi Bölümü -->
+        <div class="profile-section profile-image-upload">
+          <h2><i class="fas fa-image"></i> Profil Resmi</h2>
+          <div class="image-preview-container">
+            <img [src]="profileForm.get('profileImageUrl')?.value || 'https://placehold.co/150x150/cccccc/333333?text=Profil'" alt="Profil Resmi" class="profile-image-preview">
+            <p class="image-description">Profilinizde görünecek resmi belirleyin.</p>
+          </div>
+          <div class="form-group">
+            <label for="profileImageUrl">Profil Resmi URL'si:</label>
+            <input type="url" id="profileImageUrl" formControlName="profileImageUrl" class="form-control" placeholder="Resim URL'sini girin">
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="lastName">Soyadınız</label>
-          <input type="text" id="lastName" formControlName="lastName" class="form-control">
-          <div *ngIf="profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched" class="error-message">
-            Soyadınız zorunludur.
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="username">Kullanıcı Adı</label>
-          <input type="text" id="username" formControlName="username" class="form-control" [disabled]="!!profileForm.get('username')?.disabled">
-        </div>
-
-        <div class="form-group">
-          <label for="email">E-posta</label>
-          <input type="email" id="email" formControlName="email" class="form-control" [disabled]="!!profileForm.get('email')?.disabled">
-        </div>
-
-        <div class="form-group">
-          <label for="bio">Hakkınızda</label>
-          <textarea id="bio" formControlName="bio" class="form-control"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="profileImageUrl">Profil Fotoğrafı URL'si</label>
-          <input type="url" id="profileImageUrl" formControlName="profileImageUrl" class="form-control">
-          <div *ngIf="profileForm.get('profileImageUrl')?.hasError('pattern') && profileForm.get('profileImageUrl')?.touched" class="error-message">
-            Geçerli bir URL giriniz.
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="title">Unvanınız</label>
-          <input type="text" id="title" formControlName="title" class="form-control">
-        </div>
-
-        <div class="form-group">
-          <label for="location">Konumunuz</label>
-          <input type="text" id="location" formControlName="location" class="form-control">
-        </div>
-
-        <div class="form-group">
-          <label for="phone">Telefon Numaranız</label>
-          <input type="tel" id="phone" formControlName="phone" class="form-control">
-        </div>
-
-        <div class="form-group">
-          <label for="portfolioUrl">Portföy / Kişisel Web Sitesi URL'si</label>
-          <input type="url" id="portfolioUrl" formControlName="portfolioUrl" class="form-control">
-          <div *ngIf="profileForm.get('portfolioUrl')?.hasError('pattern') && profileForm.get('portfolioUrl')?.touched" class="error-message">
-            Geçerli bir URL giriniz.
-          </div>
-        </div>
-      </section>
-
-      <section class="form-section">
-        <h3>Sosyal Medya Bağlantıları</h3>
-        <div formArrayName="socialLinks">
-          <div *ngFor="let linkGroup of socialLinks.controls; let i = index" [formGroupName]="i" class="form-group social-link-group">
-            <label>Platform</label>
-            <input type="text" formControlName="platform" placeholder="LinkedIn, GitHub vb." class="form-control">
-            <div *ngIf="linkGroup.get('platform')?.invalid && linkGroup.get('platform')?.touched" class="error-message">
-              Platform adı zorunludur.
+        <!-- Temel Bilgiler -->
+        <div class="profile-section">
+          <h2><i class="fas fa-user-circle"></i> Temel Bilgiler</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="firstName">Ad:</label>
+              <input type="text" id="firstName" formControlName="firstName" class="form-control" placeholder="Adınızı girin">
+              <div *ngIf="profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched" class="error-message">
+                Ad gerekli.
+              </div>
             </div>
-
-            <label>URL</label>
-            <input type="url" formControlName="url" placeholder="https://..." class="form-control">
-            <div *ngIf="linkGroup.get('url')?.invalid && linkGroup.get('url')?.touched" class="error-message">
-              Geçerli bir URL giriniz.
+            <div class="form-group">
+              <label for="lastName">Soyad:</label>
+              <input type="text" id="lastName" formControlName="lastName" class="form-control" placeholder="Soyadınızı girin">
+              <div *ngIf="profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched" class="error-message">
+                Soyad gerekli.
+              </div>
             </div>
-            <button type="button" (click)="removeSocialLink(i)" class="btn btn-danger remove-button">Kaldır</button>
+          </div>
+          <div class="form-group">
+            <label for="username">Kullanıcı Adı:</label>
+            <input type="text" id="username" formControlName="username" class="form-control" placeholder="Kullanıcı adınızı girin" readonly>
+            <div *ngIf="profileForm.get('username')?.invalid && profileForm.get('username')?.touched" class="error-message">
+              Kullanıcı adı gerekli (en az 3 karakter).
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="email">E-posta:</label>
+            <input type="email" id="email" formControlName="email" class="form-control" placeholder="E-posta adresinizi girin" readonly>
+            <div *ngIf="profileForm.get('email')?.invalid && profileForm.get('email')?.touched" class="error-message">
+              Geçerli bir e-posta adresi gerekli.
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="bio">Hakkımda:</label>
+            <textarea id="bio" formControlName="bio" class="form-control" rows="4" placeholder="Kendinizden bahsedin..."></textarea>
           </div>
         </div>
-        <button type="button" (click)="addSocialLink()" class="btn btn-secondary add-button">Sosyal Medya Bağlantısı Ekle</button>
-      </section>
 
-      <section class="form-section">
-        <h3>Projeler</h3>
-        <div formArrayName="projects">
-          <div *ngFor="let projectGroup of projects.controls; let i = index" [formGroupName]="i" class="form-group project-group">
-            <label>Proje Başlığı</label>
-            <input type="text" formControlName="title" class="form-control">
-            <div *ngIf="projectGroup.get('title')?.invalid && projectGroup.get('title')?.touched" class="error-message">
-              Proje başlığı zorunludur.
+        <!-- İletişim Bilgileri -->
+        <div class="profile-section">
+          <h2><i class="fas fa-address-book"></i> İletişim Bilgileri</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="title">Unvan:</label>
+              <input type="text" id="title" formControlName="title" class="form-control" placeholder="Unvanınızı girin (örn: Yazılım Geliştirici)">
             </div>
-
-            <label>Açıklama</label>
-            <textarea formControlName="description" class="form-control"></textarea>
-
-            <label>Proje URL'si</label>
-            <input type="url" formControlName="projectUrl" placeholder="https://..." class="form-control">
-            <div *ngIf="projectGroup.get('projectUrl')?.hasError('pattern') && projectGroup.get('projectUrl')?.touched" class="error-message">
-              Geçerli bir proje URL'si giriniz.
+            <div class="form-group">
+              <label for="phoneNumber">Telefon Numarası:</label>
+              <input type="tel" id="phoneNumber" formControlName="phoneNumber" class="form-control" placeholder="Telefon numaranızı girin">
             </div>
-
-            <label>Kullanılan Teknolojiler</label>
-            <input type="text" formControlName="technologies" class="form-control" placeholder="Örn: Angular, Spring Boot, PostgreSQL">
-            <button type="button" (click)="removeProject(i)" class="btn btn-danger remove-button">Kaldır</button>
+            <div class="form-group">
+              <label for="website">Web Sitesi:</label>
+              <input type="url" id="website" formControlName="website" class="form-control" placeholder="Web sitenizin URL'sini girin">
+            </div>
+            <div class="form-group full-width">
+              <label for="address">Konum:</label>
+              <input type="text" id="address" formControlName="address" class="form-control" placeholder="Konumunuzu girin">
+            </div>
           </div>
         </div>
-        <button type="button" (click)="addProject()" class="btn btn-secondary add-button">Proje Ekle</button>
-      </section>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary" [disabled]="profileForm.invalid || isLoading">
-          <i class="fas fa-save"></i> Profili Güncelle
+        <!-- Sosyal Medya Linkleri -->
+        <div class="profile-section">
+          <h2><i class="fas fa-share-alt"></i> Sosyal Medya Linkleri</h2>
+          <div formArrayName="socialLinks">
+            <div *ngFor="let linkGroup of socialLinksFormArray.controls; let i = index" [formGroupName]="i" class="social-link-group">
+              <div class="form-grid-social">
+                <div class="form-group">
+                  <label [for]="'platform-' + i">Platform:</label>
+                  <input type="text" [id]="'platform-' + i" formControlName="platform" class="form-control" placeholder="Platform (örn: LinkedIn)">
+                </div>
+                <div class="form-group">
+                  <label [for]="'url-' + i">URL:</label>
+                  <input type="url" [id]="'url-' + i" formControlName="url" class="form-control" placeholder="URL">
+                </div>
+                <button type="button" (click)="removeSocialLink(i)" class="remove-button">
+                  <i class="fas fa-minus-circle"></i> Kaldır
+                </button>
+              </div>
+            </div>
+          </div>
+          <button type="button" (click)="addSocialLink()" class="add-button">
+            <i class="fas fa-plus-circle"></i> Sosyal Link Ekle
+          </button>
+        </div>
+
+        <!-- Projeler -->
+        <div class="profile-section">
+          <h2><i class="fas fa-project-diagram"></i> Projeler</h2>
+          <div formArrayName="projects">
+            <div *ngFor="let projectGroup of projectsFormArray.controls; let i = index" [formGroupName]="i" class="project-group">
+              <div class="form-group">
+                <label [for]="'projectName-' + i">Proje Adı:</label>
+                <input type="text" [id]="'projectName-' + i" formControlName="name" class="form-control" placeholder="Proje adı">
+              </div>
+              <div class="form-group">
+                <label [for]="'projectDescription-' + i">Açıklama:</label>
+                <textarea [id]="'projectDescription-' + i" formControlName="description" class="form-control" rows="3" placeholder="Proje açıklaması"></textarea>
+              </div>
+              <div class="form-group">
+                <label [for]="'projectTechnologies-' + i">Teknolojiler (virgülle ayırın):</label>
+                <input type="text" [id]="'projectTechnologies-' + i" formControlName="technologies" class="form-control" placeholder="örn: Angular, Spring Boot">
+              </div>
+              <div class="form-group">
+                <label [for]="'projectUrl-' + i">Proje URL'si:</label>
+                <input type="url" [id]="'projectUrl-' + i" formControlName="url" class="form-control" placeholder="Proje URL'si">
+              </div>
+              <button type="button" (click)="removeProject(i)" class="remove-button">
+                <i class="fas fa-minus-circle"></i> Projeyi Kaldır
+                </button>
+            </div>
+          </div>
+          <button type="button" (click)="addProject()" class="add-button">
+            <i class="fas fa-plus-circle"></i> Proje Ekle
+          </button>
+        </div>
+
+        <!-- Şifre Güncelleme -->
+        <div class="profile-section">
+          <h2><i class="fas fa-key"></i> Şifre Güncelle</h2>
+          <div class="form-group">
+            <label for="currentPassword">Mevcut Şifre:</label>
+            <input type="password" id="currentPassword" formControlName="currentPassword" class="form-control" placeholder="Mevcut şifrenizi girin">
+          </div>
+          <div class="form-group">
+            <label for="newPassword">Yeni Şifre:</label>
+            <input type="password" id="newPassword" formControlName="newPassword" class="form-control" placeholder="Yeni şifrenizi girin">
+            <div *ngIf="profileForm.get('newPassword')?.invalid && profileForm.get('newPassword')?.touched" class="error-message">
+              Yeni şifre en az 6 karakter olmalı.
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="confirmNewPassword">Yeni Şifreyi Onayla:</label>
+            <input type="password" id="confirmNewPassword" formControlName="confirmNewPassword" class="form-control" placeholder="Yeni şifrenizi tekrar girin">
+            <div *ngIf="profileForm.get('confirmNewPassword')?.invalid && profileForm.get('confirmNewPassword')?.touched" class="error-message">
+              Yeni şifre onayı gerekli.
+            </div>
+            <div *ngIf="profileForm.errors?.['newPasswordsMismatch'] && profileForm.get('confirmNewPassword')?.touched" class="error-message">
+              Yeni şifreler eşleşmiyor.
+            </div>
+          </div>
+          <button type="button" (click)="updatePassword()" class="submit-button" [disabled]="!profileForm.get('currentPassword')?.value || !profileForm.get('newPassword')?.value || !profileForm.get('confirmNewPassword')?.value || profileForm.get('newPassword')?.invalid || profileForm.errors?.['newPasswordsMismatch']">
+            <i class="fas fa-sync-alt"></i> Şifreyi Güncelle
+          </button>
+        </div>
+
+        <button type="submit" class="submit-button" [disabled]="profileForm.invalid || isLoading">
+          <i class="fas fa-save"></i> {{ isLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet' }}
         </button>
-        <button type="button" (click)="goToHome()" class="btn btn-secondary">
-          <i class="fas fa-times"></i> İptal
-        </button>
-        <button type="button" routerLink="/profile/password-update" class="btn btn-info password-update-button">
-          <i class="fas fa-key"></i> Şifre Güncelle
-        </button>
-        <button type="button" (click)="confirmAccountDeletion()" class="btn btn-danger delete-account-button">
+      </form>
+
+      <div class="danger-zone card-section">
+        <h3><i class="fas fa-exclamation-triangle"></i> Tehlike Bölgesi</h3>
+        <p>Hesabınızı kalıcı olarak silmek istiyorsanız aşağıdaki düğmeyi kullanın.</p>
+        <button type="button" (click)="confirmDeleteAccount()" class="delete-account-button">
           <i class="fas fa-trash-alt"></i> Hesabı Sil
         </button>
       </div>
-    </form>
-
-    <div *ngIf="!isLoading && !currentUserProfile" class="no-profile-data">
-      <p>Profil bilgileriniz yüklenemedi veya bulunamadı. Lütfen giriş yapın veya daha sonra tekrar deneyin.</p>
     </div>
   </main>
 </div>

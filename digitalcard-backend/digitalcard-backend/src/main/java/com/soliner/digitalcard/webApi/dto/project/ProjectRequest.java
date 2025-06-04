@@ -22,4 +22,8 @@ public class ProjectRequest {
 
    @NotNull(message = "Kullanıcı ID'si boş olamaz") // Bu projenin hangi kullanıcıya ait olduğunu belirten kullanıcı ID'si. Boş olamaz.
    private Long userId;
+   
+
+   @Size(max = 500, message = "Proje görseli URL'si 500 karakterden uzun olamaz") // YENİ: Proje görseli URL'sinin maksimum uzunluğu.
+   private String projectImageUrl; // YENİ: Proje görseli URL'si
 }

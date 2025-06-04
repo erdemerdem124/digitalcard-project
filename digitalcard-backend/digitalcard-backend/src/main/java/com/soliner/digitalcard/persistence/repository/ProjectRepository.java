@@ -22,6 +22,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @param userId Projelerin ait olduğu kullanıcının ID'si.
      * @return Belirtilen kullanıcıya ait Project listesi.
      */
-    List<Project> findByUserId(Long userId);
+    List<Project> findByUser_Id(Long userId); // <-- Burası düzeltildi!
 }
 

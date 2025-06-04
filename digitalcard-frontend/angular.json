@@ -26,12 +26,15 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
+              "src/favicon.ico",
+              "src/assets",     
               {
                 "glob": "**/*",
                 "input": "public"
               }
             ],
             "styles": [
+              "node_modules/@fortawesome/fontawesome-free/css/all.min.css", 
               "src/styles.scss"
             ],
             "scripts": [],
@@ -56,7 +59,7 @@
                 }
               ],
               "outputHashing": "all",
-              "fileReplacements": [ 
+              "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.production.ts"
@@ -67,7 +70,7 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true,
-              "fileReplacements": [ 
+              "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.development.ts"
@@ -102,12 +105,15 @@
             "tsConfig": "tsconfig.spec.json",
             "inlineStyleLanguage": "scss",
             "assets": [
+              "src/favicon.ico", 
+              "src/assets",     
               {
                 "glob": "**/*",
                 "input": "public"
               }
             ],
-            "styles": [
+            "styles": [ 
+              "node_modules/@fortawesome/fontawesome-free/css/all.min.css",
               "src/styles.scss"
             ],
             "scripts": []

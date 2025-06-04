@@ -2,10 +2,10 @@ package com.soliner.digitalcard.application.services.impl;
 
 import com.soliner.digitalcard.application.mapper.SocialLinkMapper;
 import com.soliner.digitalcard.application.services.interfaces.SocialLinkService;
-import com.soliner.digitalcard.application.services.interfaces.UserService; // UserService'i import edin
+import com.soliner.digitalcard.application.services.interfaces.UserService;
 import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
 import com.soliner.digitalcard.domain.model.SocialLink;
-import com.soliner.digitalcard.domain.model.User;
+import com.soliner.digitalcard.domain.model.User; // User entity'sini import edin
 import com.soliner.digitalcard.persistence.repository.SocialLinkRepository;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkRequest;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkResponse;
@@ -25,7 +25,7 @@ public class SocialLinkServiceImpl implements SocialLinkService {
 
     private final SocialLinkRepository socialLinkRepository;
     private final SocialLinkMapper socialLinkMapper;
-    private final UserService userService; // UserRepository yerine UserService enjekte edildi
+    private final UserService userService;
 
     public SocialLinkServiceImpl(SocialLinkRepository socialLinkRepository, SocialLinkMapper socialLinkMapper, UserService userService) {
         this.socialLinkRepository = socialLinkRepository;
@@ -37,8 +37,8 @@ public class SocialLinkServiceImpl implements SocialLinkService {
     @Transactional
     public SocialLinkResponse createSocialLink(SocialLinkRequest request) {
         // 1. Kullanıcıyı bulma (UserService aracılığıyla)
-        User user = userService.getUserById(request.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", request.getUserId()));
+        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+        User user = userService.getUserById(request.getUserId()); 
 
         // 2. DTO'dan Entity'ye dönüşüm
         SocialLink socialLink = socialLinkMapper.toEntity(request);
@@ -59,13 +59,10 @@ public class SocialLinkServiceImpl implements SocialLinkService {
                 .orElseThrow(() -> new ResourceNotFoundException("Sosyal Link", "ID", id));
 
         // 2. Kullanıcı ID'si değişiyorsa veya geçerli değilse kontrol et ve güncelle
-        // Not: Genellikle bir sosyal linkin kullanıcısı değişmez.
-        // Eğer bu iş kuralı ise, aşağıdaki if bloğunu kaldırabilirsiniz.
-        // Eğer değişebilir ve InvalidInputException fırlatmak istiyorsanız, onu da ekleyebilirsiniz.
         if (request.getUserId() != null &&
-            (existingLink.getUser() == null || !existingLink.getUser().getId().equals(request.getUserId()))) {
-            User newUser = userService.getUserById(request.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", request.getUserId()));
+                (existingLink.getUser() == null || !existingLink.getUser().getId().equals(request.getUserId()))) {
+            // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+            User newUser = userService.getUserById(request.getUserId());
             existingLink.setUser(newUser);
         }
 
@@ -93,11 +90,12 @@ public class SocialLinkServiceImpl implements SocialLinkService {
     public List<SocialLinkResponse> getSocialLinksByUserId(Long userId) {
         // 1. Kullanıcının varlığını kontrol etme (iyi bir pratik)
         // Eğer kullanıcı yoksa, ona ait linkler de olamaz.
-        userService.getUserById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", userId));
+        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+        userService.getUserById(userId);
 
         // 2. Kullanıcıya ait sosyal linkleri Repository'den çekme
-        List<SocialLink> socialLinks = socialLinkRepository.findByUserId(userId);
+        // SocialLink entity'nizdeki User ilişkisi üzerinden sorgulama için findByUser_Id kullanın.
+        List<SocialLink> socialLinks = socialLinkRepository.findByUser_Id(userId);
 
         // 3. Entity listesinden Response DTO listesine dönüşüm ve döndürme
         return socialLinks.stream()

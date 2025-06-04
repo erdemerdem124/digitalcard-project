@@ -28,13 +28,13 @@ export interface User {
 }
 
 // Giriş işlemi için kimlik bilgileri arayüzü
-interface LoginCredentials {
+export interface LoginCredentials {
   usernameOrEmail: string;
   password: string;
 }
 
 // Kayıt işlemi için kullanıcı bilgileri arayüzü
-interface RegisterRequest {
+export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
@@ -49,8 +49,8 @@ export interface PasswordUpdateRequest {
 }
 
 const AUTH_API = 'http://localhost:8080/api/auth/';
-const JWT_TOKEN_KEY = 'jwt_token'; // JWT token'ı için yeni sabit anahtar
-const CURRENT_USER_KEY = 'currentUser'; // Kullanıcı objesi için yeni sabit anahtar
+const JWT_TOKEN_KEY = 'jwt_token';
+const CURRENT_USER_KEY = 'currentUser';
 
 @Injectable({
   providedIn: 'root'
@@ -69,38 +69,39 @@ export class AuthService {
   ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
 
-    let storedUser: User | null = null;
+    let initialUser: User | null = null;
     if (this.isBrowser) {
+      const token = localStorage.getItem(JWT_TOKEN_KEY);
       const userString = localStorage.getItem(CURRENT_USER_KEY);
-      if (userString) {
+
+      if (token && userString) {
         try {
-          storedUser = JSON.parse(userString);
-          // Eğer storedUser varsa ama token'ı localStorage'da yoksa, token'ı ekle
-          if (storedUser && !storedUser.token) {
-            const tokenFromStorage = localStorage.getItem(JWT_TOKEN_KEY);
-            if (tokenFromStorage) {
-              storedUser.token = tokenFromStorage;
-            } else {
-              // Eğer ne user objesinde ne de ayrı token anahtarında token yoksa, oturumu sıfırla
-              console.warn("AuthService: localStorage'dan yüklenen kullanıcı objesinde veya ayrı anahtarda token eksik. Oturum sıfırlanıyor.");
-              storedUser = null;
-              localStorage.removeItem(CURRENT_USER_KEY);
-              localStorage.removeItem(JWT_TOKEN_KEY);
-            }
+          const parsedUser = JSON.parse(userString);
+          if (parsedUser && parsedUser.id && parsedUser.username && parsedUser.email) {
+            initialUser = {
+              id: parsedUser.id,
+              username: parsedUser.username,
+              email: parsedUser.email,
+              token: token
+            };
+          } else {
+            console.warn("AuthService: localStorage'dan yüklenen kullanıcı objesi eksik veya hatalı. Oturum sıfırlanıyor.");
+            this.clearLocalStorage();
           }
         } catch (e) {
-          console.error("localStorage'dan kullanıcı bilgisi okunurken hata oluştu:", e);
-          localStorage.removeItem(CURRENT_USER_KEY);
-          localStorage.removeItem(JWT_TOKEN_KEY); // Token'ı da temizle
+          console.error("AuthService: localStorage'dan kullanıcı bilgisi okunurken hata oluştu:", e);
+          this.clearLocalStorage();
         }
+      } else if (token || userString) {
+        console.warn("AuthService: localStorage'da kullanıcı objesi veya token eksik/tutarsız. Oturum sıfırlanıyor.");
+        this.clearLocalStorage();
       }
     }
-    this.currentUserSubject = new BehaviorSubject<User | null>(storedUser);
+    this.currentUserSubject = new BehaviorSubject<User | null>(initialUser);
     this.currentUser = this.currentUserSubject.asObservable();
   }
 
   public get isLoggedIn(): boolean {
-    // Hem currentUserSubject'in değeri hem de localStorage'daki token kontrol edilebilir
     return this.currentUserSubject.value !== null && this.getToken() !== null;
   }
 
@@ -108,7 +109,6 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
-  // Giriş işlemi
   login(credentials: LoginCredentials): Observable<User> {
     const httpOptions = {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' })
@@ -116,19 +116,18 @@ export class AuthService {
     
     return this.http.post<AuthResponse>(AUTH_API + 'login', credentials, httpOptions).pipe(
       map(response => {
-        // AuthResponse'dan gelen verilerle User objesini oluştur
         const user: User = {
           id: response.id,
           username: response.username,
           email: response.email,
-          token: response.accessToken // Token'ı User objesine ata
+          token: response.accessToken
         };
         return user;
       }),
       tap(user => {
         if (this.isBrowser) {
-          localStorage.setItem(JWT_TOKEN_KEY, user.token); // JWT token'ı ayrı bir anahtarla kaydet
-          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user)); // Kullanıcı objesini kaydet
+          localStorage.setItem(JWT_TOKEN_KEY, user.token);
+          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
           console.log('AuthService: JWT token ve kullanıcı bilgisi localStorage\'a kaydedildi.');
         }
         this.currentUserSubject.next(user);
@@ -137,11 +136,8 @@ export class AuthService {
       catchError(error => {
         console.error('AuthService: Giriş hatası:', error);
         this.currentUserSubject.next(null);
-        if (this.isBrowser) {
-          localStorage.removeItem(JWT_TOKEN_KEY); // Hata durumunda token'ı temizle
-          localStorage.removeItem(CURRENT_USER_KEY); // Hata durumunda kullanıcı objesini temizle
-          console.warn('AuthService: Giriş hatası nedeniyle localStorage temizlendi.');
-        }
+        this.clearLocalStorage();
+        console.warn('AuthService: Giriş hatası nedeniyle localStorage temizlendi.');
         const errorMessage = error.error?.message || error.message || 'Giriş başarısız oldu. Lütfen kullanıcı adı/e-posta ve şifrenizi kontrol edin.';
         this.toastService.error(errorMessage);
         return throwError(() => new Error(errorMessage));
@@ -154,6 +150,9 @@ export class AuthService {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' })
     };
     return this.http.post(AUTH_API + 'register', user, httpOptions).pipe(
+      tap(() => {
+        this.toastService.success('Kayıt işlemi başarıyla tamamlandı. Şimdi giriş yapabilirsiniz.');
+      }),
       catchError(error => {
         console.error('Kayıt hatası:', error);
         const errorMessage = error.error?.message || error.message || 'Kayıt işlemi başarısız oldu. Lütfen bilgilerinizi kontrol edin.';
@@ -164,19 +163,15 @@ export class AuthService {
   }
 
   updatePassword(userId: number, passwordUpdate: PasswordUpdateRequest): Observable<any> {
-    // Bu metot zaten token'ı getToken() üzerinden alıyor, bu yüzden Authorization başlığını burada manuel eklemeye gerek yok.
-    // AuthInterceptor zaten bunu yapacak.
     const httpOptions = {
       headers: new HttpHeaders({
         'Content-Type': 'application/json'
-        // 'Authorization' başlığı AuthInterceptor tarafından eklenecek
       })
     };
     return this.http.put(`${AUTH_API}users/${userId}/password`, passwordUpdate, httpOptions)
       .pipe(
         tap(() => {
           this.toastService.success('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.');
-          // Şifre güncellendikten sonra oturumu kapatıp yeniden giriş yapılmasını sağlamak iyi bir güvenlik uygulamasıdır.
           this.logout();
         }),
         catchError(error => {
@@ -188,20 +183,23 @@ export class AuthService {
       );
   }
 
-  // Interceptor'ın doğrudan kullanacağı metod
   getToken(): string | null {
     if (this.isBrowser) {
-      return localStorage.getItem(JWT_TOKEN_KEY); // Doğrudan localStorage'dan oku
+      return localStorage.getItem(JWT_TOKEN_KEY);
     }
     return null;
   }
 
-  logout(): void {
+  private clearLocalStorage(): void {
     if (this.isBrowser) {
-      localStorage.removeItem(JWT_TOKEN_KEY); // JWT token'ı temizle
-      localStorage.removeItem(CURRENT_USER_KEY); // Kullanıcı objesini temizle
-      console.log('AuthService: localStorage temizlendi ve oturum kapatıldı.');
+      localStorage.removeItem(JWT_TOKEN_KEY);
+      localStorage.removeItem(CURRENT_USER_KEY);
     }
+  }
+
+  logout(): void {
+    this.clearLocalStorage();
+    console.log('AuthService: Oturum kapatıldı ve localStorage temizlendi.');
     this.currentUserSubject.next(null);
     this.toastService.info('Oturumunuz kapatıldı.');
     this.router.navigate(['/login']);

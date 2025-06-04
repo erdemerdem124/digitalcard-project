@@ -1,391 +1,321 @@
 // src/app/components/profile-edit/profile-edit.component.ts
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormArray, AbstractControl } from '@angular/forms';
-import { Router, ActivatedRoute, RouterModule, ParamMap } from '@angular/router';
-import { Observable, of, switchMap, forkJoin, throwError } from 'rxjs';
-import { tap, catchError, finalize } from 'rxjs/operators';
-
-import { UserService, UserProfile, SocialLink, Project, UserRequest } from '../../services/user.service';
-// SocialsLinkService yerine SocialLinkService olarak düzeltildi
-import { SocialLinkService, SocialLinkRequest, SocialLinkResponse } from '../../services/social-link.service';
-import { ProjectService, ProjectRequest, ProjectResponse } from '../../services/project.service';
-
-import { AuthService } from '../../services/auth.service';
+import { FormBuilder, FormGroup, Validators, FormArray, ReactiveFormsModule } from '@angular/forms'; // ReactiveFormsModule import edildi
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { UserService, UserProfile, SocialLink, Project } from '../../services/user.service';
+import { AuthService, User, PasswordUpdateRequest } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { Subscription } from 'rxjs';
+import { ThemeService, Theme } from '../../services/theme.service';
 
 @Component({
   selector: 'app-profile-edit',
   standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    RouterModule
-  ],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule], // ReactiveFormsModule eklendi
   templateUrl: './profile-edit.component.html',
-  styleUrl: './profile-edit.component.scss'
+  styleUrl: './profile-edit.component.scss' // Düzeltildi
 })
-export class ProfileEditComponent implements OnInit {
-
+export class ProfileEditComponent implements OnInit, OnDestroy {
   profileForm!: FormGroup;
-  currentUserProfile: UserProfile | null = null;
+  currentUser: User | null = null;
+  userProfile: UserProfile | null = null;
   isLoading: boolean = true;
-  currentUsername: string | null = null;
-  currentUserId: number | null = null;
+  errorMessage: string = '';
+  private authSubscription!: Subscription;
+  private profileSubscription!: Subscription;
+  profileEditUrl: string = '';
+  currentTheme: Theme;
+  public Theme = Theme;
 
   constructor(
     private fb: FormBuilder,
     private userService: UserService,
     private authService: AuthService,
-    private router: Router,
     private route: ActivatedRoute,
-    // SocialsLinkService yerine SocialLinkService olarak düzeltildi
-    private socialLinkService: SocialLinkService,
-    private projectService: ProjectService,
-    private toastService: ToastService
-  ) { }
+    private router: Router,
+    private toastService: ToastService,
+    private themeService: ThemeService
+  ) {
+    this.currentTheme = this.themeService.getTheme();
+  }
 
   ngOnInit(): void {
+    this.themeService.currentTheme$.subscribe(theme => {
+      this.currentTheme = theme;
+    });
+
     this.profileForm = this.fb.group({
+      profileImageUrl: [''],
       firstName: ['', Validators.required],
       lastName: ['', Validators.required],
-      username: [{ value: '', disabled: true }, Validators.required], 
+      username: [{ value: '', disabled: true }, Validators.required],
       email: [{ value: '', disabled: true }, [Validators.required, Validators.email]],
       bio: [''],
-      profileImageUrl: ['', Validators.pattern(/^(https?:\/\/.+\..+)$/)],
       title: [''],
-      location: [''],
-      phone: [''],
-      portfolioUrl: ['', Validators.pattern(/^(https?:\/\/.+\..+)$/)],
+      // company: [''], // Şirket alanı kaldırıldı
+      phoneNumber: [''],
+      website: [''],
+      address: [''], // Adres alanı Konum olarak kullanılacak
       socialLinks: this.fb.array([]),
-      projects: this.fb.array([])
-    });
+      projects: this.fb.array([]),
+      currentPassword: [''],
+      newPassword: ['', Validators.minLength(6)],
+      confirmNewPassword: ['']
+    }, { validator: this.newPasswordMatchValidator });
 
-    this.route.paramMap.subscribe((params: ParamMap) => { 
-      this.currentUsername = params.get('username');
-      if (this.currentUsername) {
-        this.loadUserProfileAndRelatedData(this.currentUsername);
+    this.authSubscription = this.authService.currentUser.subscribe(user => {
+      this.currentUser = user;
+      if (user) {
+        this.profileEditUrl = `/profile/edit/${user.username}`;
+        this.loadUserProfile(user.username);
       } else {
-        this.toastService.error('Profil yüklemek için kullanıcı adı gerekli.');
+        this.isLoading = false;
+        this.router.navigate(['/login']);
+      }
+    });
+  }
+
+  newPasswordMatchValidator(form: FormGroup) {
+    const newPassword = form.get('newPassword');
+    const confirmNewPassword = form.get('confirmNewPassword');
+
+    if (newPassword?.value && confirmNewPassword?.value && newPassword.value !== confirmNewPassword.value) {
+      confirmNewPassword.setErrors({ newPasswordsMismatch: true });
+    } else {
+      confirmNewPassword?.setErrors(null);
+    }
+    return null;
+  }
+
+  loadUserProfile(username: string): void {
+    this.isLoading = true;
+    this.profileSubscription = this.userService.getUserProfileByUsername(username).subscribe({
+      next: (profile) => {
+        this.userProfile = profile;
+        this.profileForm.patchValue({
+          profileImageUrl: profile.profileImageUrl || '',
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          username: profile.username,
+          email: profile.email,
+          bio: profile.bio || '',
+          title: profile.title || '',
+          // company: profile.company || '', // Şirket alanı kaldırıldı
+          phoneNumber: profile.phoneNumber || '',
+          website: profile.website || '',
+          address: profile.address || ''
+        });
+
+        this.setSocialLinks(profile.socialLinks);
+        this.setProjects(profile.projects);
+        this.isLoading = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading user profile:', err);
+        this.errorMessage = 'Profil yüklenirken bir hata oluştu veya profiliniz bulunamadı. Lütfen bir profil oluşturun.';
+        this.userProfile = null; // Profil yüklenemediğinde userProfile null kalır
         this.isLoading = false;
       }
     });
   }
 
-  private loadUserProfileAndRelatedData(username: string): void {
-    this.isLoading = true;
-
-    this.userService.getUserProfileByUsername(username).pipe(
-      switchMap(userProfile => {
-        if (userProfile && userProfile.id) {
-          const userId = userProfile.id;
-          this.currentUserId = userId;
-
-          return forkJoin({
-            socialLinks: this.socialLinkService.getSocialLinksByUserId(userId),
-            projects: this.projectService.getProjectsByUserId(userId)
-          }).pipe(
-            tap(({ socialLinks, projects }) => {
-              this.currentUserProfile = { ...userProfile, socialLinks: socialLinks, projects: projects };
-
-              this.profileForm.patchValue({
-                firstName: userProfile.firstName,
-                lastName: userProfile.lastName,
-                username: userProfile.username,
-                email: userProfile.email,
-                bio: userProfile.bio || '',
-                profileImageUrl: userProfile.profileImageUrl || '',
-                title: userProfile.title || '',
-                location: userProfile.location || '',
-                phone: userProfile.phone || '',
-                portfolioUrl: userProfile.portfolioUrl || ''
-              });
-
-              while (this.socialLinks.length !== 0) {
-                this.socialLinks.removeAt(0);
-              }
-              // link parametresine tip verildi
-              socialLinks.forEach((link: SocialLink) => this.addSocialLink(link));
-              
-              while (this.projects.length !== 0) {
-                this.projects.removeAt(0);
-              }
-              projects.forEach((project: Project) => this.addProject(project));
-            })
-          );
-        } else {
-          this.router.navigate(['/login']);
-          return throwError(() => new Error('Kullanıcı profili bulunamadı veya ID eksik.'));
-        }
-      }),
-      // err parametresine tip verildi
-      catchError((err: any) => {
-        console.error('Profil ve ilgili veriler yüklenirken hata oluştu:', err);
-        this.toastService.error(err.message || 'Profil ve ilgili veriler yüklenirken bir hata oluştu.');
-        this.isLoading = false;
-        return throwError(() => new Error(err.message || 'Bilinmeyen bir hata oluştu.'));
-      }),
-      finalize(() => {
-        this.isLoading = false;
-      })
-    ).subscribe(
-      () => { /* handled by tap and finalize */ },
-      // err parametresine tip verildi
-      (err: any) => {
-        // Hata zaten catchError'da işlendiği için burada ek bir işlem yapmaya gerek yok
-      }
-    );
-  }
-
-  // --- Sosyal Medya Linkleri Yönetimi ---
-  get socialLinks(): FormArray {
+  get socialLinksFormArray(): FormArray {
     return this.profileForm.get('socialLinks') as FormArray;
   }
 
-  createSocialLinkGroup(link?: SocialLink): FormGroup {
-    return this.fb.group({
-      id: [link?.id || null],
-      platform: [link?.platform || '', Validators.required],
-      url: [link?.url || '', [Validators.required, Validators.pattern('https?://.+')]]
-    });
-  }
-
-  addSocialLink(link?: SocialLink): void {
-    this.socialLinks.push(this.createSocialLinkGroup(link));
-    this.toastService.info('Yeni sosyal link alanı eklendi.');
+  addSocialLink(): void {
+    this.socialLinksFormArray.push(this.fb.group({
+      platform: ['', Validators.required],
+      url: ['', Validators.required]
+    }));
   }
 
   removeSocialLink(index: number): void {
-    const linkControl = this.socialLinks.at(index);
-    if (linkControl && linkControl.get('id')?.value) {
-      const linkId = linkControl.get('id')?.value;
-      if (confirm('Bu sosyal linki silmek istediğinizden emin misiniz?')) {
-        this.socialLinkService.deleteSocialLink(linkId).subscribe({
-          next: () => {
-            this.socialLinks.removeAt(index);
-            this.toastService.success('Sosyal link başarıyla silindi.');
-          },
-          // err parametresine tip verildi
-          error: (err: any) => {
-            console.error('Sosyal link silme hatası:', err);
-            this.toastService.error(err.message || 'Sosyal link silinirken bir hata oluştu.');
-          }
-        });
-      }
-    } else {
-      this.socialLinks.removeAt(index);
-      this.toastService.info('Sosyal link alanı kaldırıldı (kaydedilmemişse).');
-    }
+    this.socialLinksFormArray.removeAt(index);
   }
 
-  // --- Projeler Yönetimi ---
-  get projects(): FormArray {
-    return this.profileForm.get('projects') as FormArray;
-  }
-
-  createProjectGroup(project?: Project): FormGroup {
-    return this.fb.group({
-      id: [project?.id || null],
-      title: [project?.title || '', Validators.required],
-      description: [project?.description || ''],
-      projectUrl: [project?.projectUrl || '', Validators.pattern('https?://.+')],
-      technologies: [project?.technologies || '']
+  private setSocialLinks(socialLinks: SocialLink[]): void {
+    this.socialLinksFormArray.clear();
+    socialLinks.forEach(link => {
+      this.socialLinksFormArray.push(this.fb.group({
+        platform: [link.platform, Validators.required],
+        url: [link.url, Validators.required]
+      }));
     });
   }
 
-  addProject(project?: Project): void {
-    this.projects.push(this.createProjectGroup(project));
-    this.toastService.info('Yeni proje alanı eklendi.');
+  get projectsFormArray(): FormArray {
+    return this.profileForm.get('projects') as FormArray;
+  }
+
+  addProject(): void {
+    this.projectsFormArray.push(this.fb.group({
+      name: ['', Validators.required],
+      description: [''],
+      technologies: [''], // Başlangıçta boş string
+      url: ['']
+    }));
   }
 
   removeProject(index: number): void {
-    const projectControl = this.projects.at(index);
-    if (projectControl && projectControl.get('id')?.value) {
-      const projectId = projectControl.get('id')?.value;
-      if (confirm('Bu projeyi silmek istediğinizden emin misiniz?')) {
-        this.projectService.deleteProject(projectId).subscribe({
-          next: () => {
-            this.projects.removeAt(index);
-            this.toastService.success('Proje başarıyla silindi.');
-          },
-          // err parametresine tip verildi
-          error: (err: any) => {
-            console.error('Proje silme hatası:', err);
-            this.toastService.error(err.message || 'Proje silinirken bir hata oluştu.');
-          }
-        });
-      }
-    } else {
-      this.projects.removeAt(index);
-      this.toastService.info('Proje alanı kaldırıldı (kaydedilmemişse).');
-    }
+    this.projectsFormArray.removeAt(index);
   }
 
-  // --- Form Gönderme (onSubmit) ---
+  private setProjects(projects: Project[]): void {
+    this.projectsFormArray.clear();
+    projects.forEach(project => {
+      this.projectsFormArray.push(this.fb.group({
+        name: [project.name, Validators.required],
+        description: [project.description || ''],
+        technologies: [project.technologies?.join(', ') || ''], // Array'i string'e çevir
+        url: [project.url || '']
+      }));
+    });
+  }
+
   onSubmit(): void {
+    this.errorMessage = '';
     if (this.profileForm.invalid) {
       this.profileForm.markAllAsTouched();
-      this.toastService.error('Lütfen tüm alanları doğru şekilde doldurun.');
+      this.toastService.error('Lütfen tüm gerekli alanları doğru şekilde doldurun.');
       return;
     }
 
-    if (this.currentUserId === null) {
-      this.toastService.error('Kullanıcı ID\'si bulunamadı. Profil güncellenemedi.');
-      return;
-    }
-
-    const userId = this.currentUserId;
+    this.isLoading = true;
     const formValue = this.profileForm.getRawValue();
 
-    const userProfileUpdate: UserRequest = {
+    const updatedProfile: UserProfile = {
+      id: this.userProfile?.id || 0,
+      userId: this.currentUser?.id || 0,
+      profileImageUrl: formValue.profileImageUrl,
       firstName: formValue.firstName,
       lastName: formValue.lastName,
       username: formValue.username,
       email: formValue.email,
       bio: formValue.bio,
-      profileImageUrl: formValue.profileImageUrl,
       title: formValue.title,
-      location: formValue.location,
-      phone: formValue.phone,
-      portfolioUrl: formValue.portfolioUrl
+      // company: formValue.company, // Şirket alanı kaldırıldı
+      phoneNumber: formValue.phoneNumber,
+      website: formValue.website,
+      address: formValue.address,
+      socialLinks: formValue.socialLinks,
+      projects: formValue.projects.map((p: any) => ({
+        ...p,
+        technologies: p.technologies ? p.technologies.split(',').map((tech: string) => tech.trim()) : [] // String'i Array'e çevir
+      }))
     };
 
-    const updateObservables: Observable<any>[] = [];
-
-    updateObservables.push(this.userService.updateUserProfile(userId, userProfileUpdate));
-
-    const currentSocialLinks: SocialLink[] = this.currentUserProfile?.socialLinks || [];
-    const formSocialLinks: (SocialLink & { id?: number })[] = formValue.socialLinks;
-
-    formSocialLinks.forEach((formLink: SocialLink) => { // formLink parametresine tip verildi
-      if (formLink.id) {
-        const originalLink = currentSocialLinks.find(link => link.id === formLink.id);
-        if (originalLink && (originalLink.platform !== formLink.platform || originalLink.url !== formLink.url)) {
-          updateObservables.push(
-            this.socialLinkService.updateSocialLink(formLink.id, {
-              platform: formLink.platform,
-              url: formLink.url,
-              userId: userId
-            })
-          );
+    if (this.userProfile?.id) { // Eğer profil ID'si varsa, güncelleme yap
+      this.userService.updateUserProfile(this.userProfile.id, updatedProfile).subscribe({
+        next: (profile) => {
+          this.userProfile = profile;
+          this.toastService.success('Profil başarıyla güncellendi!');
+          this.isLoading = false;
+          this.router.navigate(['/home']);
+        },
+        error: (err: any) => {
+          console.error('Profil güncelleme hatası:', err);
+          this.errorMessage = err.message || 'Profil güncellenirken bir hata oluştu.';
+          this.toastService.error(this.errorMessage);
+          this.isLoading = false;
         }
-      } else {
-        updateObservables.push(
-          this.socialLinkService.createSocialLink({
-            platform: formLink.platform,
-            url: formLink.url,
-            userId: userId
-          })
-        );
-      }
-    });
-
-    currentSocialLinks.forEach((originalLink: SocialLink) => { // originalLink parametresine tip verildi
-      const existsInForm = formSocialLinks.some(formLink => formLink.id === originalLink.id);
-      if (!existsInForm && originalLink.id) {
-        updateObservables.push(this.socialLinkService.deleteSocialLink(originalLink.id));
-      }
-    });
-
-    const currentProjects: Project[] = this.currentUserProfile?.projects || [];
-    const formProjects: (Project & { id?: number })[] = formValue.projects;
-
-    formProjects.forEach((formProject: Project) => { // formProject parametresine tip verildi
-      if (formProject.id) {
-        const originalProject = currentProjects.find(project => project.id === formProject.id);
-        if (originalProject && (
-            originalProject.title !== formProject.title ||
-            originalProject.description !== formProject.description ||
-            originalProject.projectUrl !== formProject.projectUrl ||
-            originalProject.technologies !== formProject.technologies
-          )) {
-          updateObservables.push(
-            this.projectService.updateProject(formProject.id, {
-              title: formProject.title,
-              description: formProject.description,
-              projectUrl: formProject.projectUrl,
-              technologies: formProject.technologies,
-              userId: userId
-            })
-          );
+      });
+    } else { // Eğer profil ID'si yoksa, yeni profil oluştur
+      this.userService.createUserProfile(updatedProfile).subscribe({
+        next: (profile) => {
+          this.userProfile = profile;
+          this.toastService.success('Profil başarıyla oluşturuldu!');
+          this.isLoading = false;
+          this.router.navigate(['/home']);
+        },
+        error: (err: any) => {
+          console.error('Profil oluşturma hatası:', err);
+          this.errorMessage = err.error?.message || err.message || 'Profil oluşturulurken bir hata oluştu.';
+          this.toastService.error(this.errorMessage);
+          this.isLoading = false;
         }
-      } else {
-        updateObservables.push(
-          this.projectService.createProject({
-            title: formProject.title,
-            description: formProject.description,
-            projectUrl: formProject.projectUrl,
-            technologies: formProject.technologies,
-            userId: userId
-          })
-        );
-      }
-    });
-
-    currentProjects.forEach((originalProject: Project) => { // originalProject parametresine tip verildi
-      const existsInForm = formProjects.some(formProject => formProject.id === originalProject.id);
-      if (!existsInForm && originalProject.id) {
-        updateObservables.push(this.projectService.deleteProject(originalProject.id));
-      }
-    });
-
-    forkJoin(updateObservables).subscribe({
-      next: (responses) => {
-        this.toastService.success('Profiliniz başarıyla güncellendi!');
-        this.loadUserProfileAndRelatedData(this.currentUsername!);
-      },
-      // err parametresine tip verildi
-      error: (err: any) => {
-        console.error('Profil güncelleme hatası:', err);
-        this.toastService.error(err.message || 'Profil güncellenirken bir hata oluştu.');
-      }
-    });
+      });
+    }
   }
 
-  private markAllAsTouched(formGroup: FormGroup | FormArray): void {
-    Object.values(formGroup.controls).forEach((control: AbstractControl) => {
-      if (control instanceof FormGroup || control instanceof FormArray) {
-        this.markAllAsTouched(control);
-      } else {
-        control.markAsTouched();
-      }
-    });
+  updatePassword(): void {
+    const currentPassword = this.profileForm.get('currentPassword')?.value;
+    const newPassword = this.profileForm.get('newPassword')?.value;
+    const confirmNewPassword = this.profileForm.get('confirmNewPassword')?.value;
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      this.toastService.error('Lütfen mevcut şifrenizi, yeni şifrenizi ve yeni şifre onayını doldurun.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      this.toastService.error('Yeni şifreler eşleşmiyor.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      this.toastService.error('Yeni şifre en az 6 karakter olmalıdır.');
+      return;
+    }
+
+    if (this.currentUser?.id) {
+      const passwordUpdate: PasswordUpdateRequest = { currentPassword, newPassword };
+      this.authService.updatePassword(this.currentUser.id, passwordUpdate).subscribe({
+        next: () => {
+          this.profileForm.patchValue({
+            currentPassword: '',
+            newPassword: '',
+            confirmNewPassword: ''
+          });
+        },
+        error: (err: any) => {
+          console.error('Şifre güncelleme hatası:', err);
+        }
+      });
+    } else {
+      this.toastService.error('Şifre güncellemek için geçerli bir kullanıcı bulunamadı.');
+    }
   }
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/login']);
-    this.toastService.info('Çıkış yapıldı.');
   }
 
-  goToHome(): void {
-    this.router.navigate(['/home']);
-  }
-
-  confirmAccountDeletion(): void {
-    // confirm yerine daha şık bir modal kullanılabilir
-    if (confirm('Hesabınızı kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+  confirmDeleteAccount(): void {
+    const confirmDelete = window.confirm('Hesabınızı kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.');
+    if (confirmDelete) {
       this.deleteAccount();
     }
   }
 
   deleteAccount(): void {
-    if (this.currentUserId === null) {
-      this.toastService.error('Kullanıcı ID\'si bulunamadı. Hesap silinemedi.');
-      return;
+    if (this.currentUser?.id) {
+      this.userService.deleteUserProfile(this.currentUser.id).subscribe({
+        next: () => {
+          this.toastService.success('Hesabınız başarıyla silindi.');
+          this.authService.logout();
+        },
+        error: (err: any) => {
+          console.error('Hesap silme hatası:', err);
+          this.toastService.error('Hesap silinirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+        }
+      });
+    } else {
+      this.toastService.error('Hesap silmek için geçerli bir kullanıcı bulunamadı.');
     }
+  }
 
-    this.userService.deleteAccount(this.currentUserId).subscribe({
-      next: () => {
-        this.toastService.success('Hesabınız başarıyla silindi.');
-        this.authService.logout(); // Kullanıcı çıkış yapsın
-        this.router.navigate(['/register']); // Kullanıcıyı kayıt sayfasına yönlendir
-      },
-      // err parametresine tip verildi
-      error: (err: any) => {
-        console.error('Hesap silme hatası:', err);
-        this.toastService.error(err.message || 'Hesap silinirken bir hata oluştu.');
-      }
-    });
+  toggleTheme(): void {
+    this.themeService.toggleTheme();
+  }
+
+  ngOnDestroy(): void {
+    if (this.authSubscription) {
+      this.authSubscription.unsubscribe();
+    }
+    if (this.profileSubscription) {
+      this.profileSubscription.unsubscribe();
+    }
   }
 }

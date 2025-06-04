@@ -17,7 +17,7 @@ public interface UserService {
     UserResponse updateUser(Long id, UserRequest userRequest);
 
     // *** BURADAKİ DEĞİŞİKLİK: ARTIK Optional<User> DÖNDÜRÜYORUZ ***
-    Optional<User> getUserById(Long id);
+    User getUserById(Long id); // <-- BURAYI DÜZELTTİK
 
     void deleteUser(Long id);
     void updatePassword(Long userId, String currentPassword, String newPassword);

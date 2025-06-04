@@ -19,5 +19,5 @@ public interface SocialLinkRepository extends JpaRepository<SocialLink, Long> {
      * @param userId Sosyal linklerin ait olduğu kullanıcının ID'si.
      * @return Belirtilen kullanıcıya ait SocialLink listesi.
      */
-    List<SocialLink> findByUserId(Long userId);
+    List<SocialLink> findByUser_Id(Long userId); // Bu metodu ekleyin
 }

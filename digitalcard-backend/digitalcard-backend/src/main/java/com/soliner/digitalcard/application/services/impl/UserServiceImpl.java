@@ -77,9 +77,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    // *** BURADAKİ DEĞİŞİKLİK: ARTIK Optional<User> DÖNDÜRÜYORUZ ***
-    public Optional<User> getUserById(Long id) {
-        return userRepository.findById(id);
+    public User getUserById(Long id) { // <-- Dönüş tipi Optional<User> yerine User olmalı
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", id));
     }
 
     @Override

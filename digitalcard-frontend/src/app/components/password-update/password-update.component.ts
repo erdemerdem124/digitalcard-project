@@ -84,9 +84,9 @@ export class PasswordUpdateComponent implements OnInit, OnDestroy {
         this.navigateToLogin();
       });
 
-    // Zaman aşımı kontrolünü biraz daha esnek hale getirelim veya kaldırabiliriz
-    // Eğer `startWith` ve `filter` doğru çalışıyorsa, bu setTimeout'a genellikle gerek kalmaz.
-    // Ancak yine de bir fallback olarak tutabiliriz, ancak süreyi artırabiliriz.
+    // ZAMAN AŞIMI KONTROLÜ GEÇİCİ OLARAK DEVRE DIŞI BIRAKILDI
+    // Bu blok, beklenmedik yönlendirmelere neden oluyordu.
+    /*
     setTimeout(() => {
         if (!this.isFormReady && this.currentUserId === null) {
             console.warn('PasswordUpdateComponent: Belirli bir süre içinde kullanıcı oturumu bilgisi alınamadı (7 saniye). Yönlendiriliyor.');
@@ -94,6 +94,7 @@ export class PasswordUpdateComponent implements OnInit, OnDestroy {
             this.navigateToLogin();
         }
     }, 7000); // Süreyi 7 saniyeye çıkardık
+    */
   }
 
   ngOnDestroy(): void {
@@ -171,8 +172,8 @@ export class PasswordUpdateComponent implements OnInit, OnDestroy {
   }
 
   goToProfileEdit(): void {
-    this.router.navigate(['/home']);
-    console.log('PasswordUpdateComponent: Profil düzenleme sayfasına yönlendiriliyor.');
+    // this.router.navigate(['/home']); // Bu satır zaten yorum satırı yapılmıştı
+    console.log('PasswordUpdateComponent: Profil düzenleme sayfasına yönlendirme girişimi engellendi.');
   }
 
   navigateToLogin(): void {

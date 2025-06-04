@@ -54,10 +54,9 @@ public class UserController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        // userService.getUserById(id) artık Optional<User> dönüyor.
-        // Bu Optional'ın içinden User objesini alıp ResourceNotFoundException ile kontrol ediyoruz.
-        User user = userService.getUserById(id)
-                            .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", id));
+        // userService.getUserById(id) artık doğrudan User nesnesi döndürüyor
+        // veya kullanıcı bulunamazsa ResourceNotFoundException fırlatıyor.
+        User user = userService.getUserById(id); // <-- .orElseThrow() kaldırıldı
 
         // UserMapper kullanarak User entity'sini UserResponse DTO'ya dönüştürüyoruz.
         UserResponse userResponse = userMapper.toResponse(user);
@@ -82,6 +81,7 @@ public class UserController {
 
         // Dönüştürme işlemini MapStruct üstleniyor:
         UserResponse userResponse = userMapper.toResponse(userOptional.get());
+        System.out.println("UserController: getUserByUsername - Dönüştürülen UserResponse: " + userResponse);
         return ResponseEntity.ok(userResponse);
     }
 

@@ -1,18 +1,228 @@
 /* src/app/components/register/register.component.scss */
 
-/* auth-container stilleri styles.scss'ten geliyor */
-
-/* Sadece bu bileşene özgü küçük ayarlamalar */
-h1 {
-  margin-bottom: var(--spacing-xl);
-  font-size: var(--font-size-lg);
-  color: var(--primary-color);
+.auth-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Dikeyde ortala */
+  align-items: center; /* Yatayda ortala */
+  min-height: 100vh; /* Tam ekran yüksekliği */
+  background-color: var(--background-color); /* Tema değişkeni */
+  font-family: 'Inter', sans-serif;
+  color: var(--text-color-primary); /* Tema değişkeni */
+  transition: background-color 0.3s ease, color 0.3s ease;
+  padding: 1rem; /* Küçük ekranlarda kenar boşluğu */
+  box-sizing: border-box;
 }
 
-.form-control.is-invalid {
-  border-color: #dc3545; /* Kırmızı border */
+.theme-toggle-container {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 10; /* Diğer elementlerin üzerinde olmasını sağla */
+
+  @media (max-width: 600px) {
+    top: 1rem;
+    right: 1rem;
+  }
 }
 
-.mt-3 {
-  margin-top: var(--spacing-md); /* Yukarı boşluk */
+.theme-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.theme-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color); /* Tema değişkeni */
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--primary-color); /* Tema değişkeni */
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.auth-card {
+  background-color: var(--card-background-color); /* Tema değişkeni */
+  border-radius: 12px;
+  box-shadow: 0 6px 12px var(--shadow-color); /* Tema değişkeni */
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 450px; /* Maksimum genişlik */
+  box-sizing: border-box;
+  text-align: center;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  border: 1px solid var(--border-color); /* Tema değişkeni */
+
+  @media (max-width: 600px) {
+    padding: 1.5rem;
+    max-width: 95%; /* Mobil cihazlarda daha geniş */
+  }
+}
+
+.auth-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary-color); /* Tema değişkeni */
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+
+  i {
+    font-size: 2.2rem;
+  }
+
+  @media (max-width: 600px) {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    i {
+      font-size: 1.8rem;
+    }
+  }
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  text-align: left; /* Label ve inputları sola hizala */
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color-primary); /* Tema değişkeni */
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--input-border-color); /* Tema değişkeni */
+  border-radius: 8px;
+  font-size: 1rem;
+  background-color: var(--background-color); /* Tema değişkeni */
+  color: var(--text-color-primary); /* Tema değişkeni */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color); /* Tema değişkeni */
+    box-shadow: 0 0 0 3px var(--input-focus-shadow); /* Tema değişkeni */
+  }
+}
+
+.error-message {
+  color: var(--error-color); /* Tema değişkeni */
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.auth-button {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  background-color: var(--primary-color); /* Tema değişkeni */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 6px var(--shadow-color); /* Tema değişkeni */
+  margin-top: 1.5rem;
+
+  &:hover:not([disabled]) {
+    background-color: var(--primary-color-dark); /* Tema değişkeni */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active:not([disabled]) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  &:disabled {
+    background-color: var(--primary-color-dark); /* Tema değişkeni */
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  i {
+    font-size: 1.2rem;
+  }
+}
+
+.auth-footer {
+  margin-top: 2rem;
+  font-size: 0.95rem;
+  color: var(--text-color-secondary); /* Tema değişkeni */
+
+  a {
+    color: var(--primary-color); /* Tema değişkeni */
+    text-decoration: none;
+    font-weight: 600;
+    transition: text-decoration 0.3s ease;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.alert-danger {
+  color: var(--error-color); /* Tema değişkeni */
+  background-color: var(--error-background); /* Tema değişkeni */
+  border: 1px solid var(--error-border); /* Tema değişkeni */
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+
+  i {
+    font-size: 1.2rem;
+  }
 }

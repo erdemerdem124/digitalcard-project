@@ -2,7 +2,7 @@ package com.soliner.digitalcard.application.services.impl;
 
 import com.soliner.digitalcard.application.mapper.ProjectMapper;
 import com.soliner.digitalcard.application.services.interfaces.ProjectService;
-import com.soliner.digitalcard.application.services.interfaces.UserService; // UserService'i import edin
+import com.soliner.digitalcard.application.services.interfaces.UserService;
 import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
 import com.soliner.digitalcard.domain.model.Project;
 import com.soliner.digitalcard.domain.model.User;
@@ -25,7 +25,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectMapper projectMapper;
-    private final UserService userService; // UserRepository yerine UserService enjekte edildi
+    private final UserService userService;
 
     // Constructor Injection: Tüm bağımlılıklar enjekte edildi
     public ProjectServiceImpl(ProjectRepository projectRepository, ProjectMapper projectMapper, UserService userService) {
@@ -38,12 +38,17 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     public ProjectResponse createProject(ProjectRequest projectRequest) {
         // 1. Kullanıcıyı bulma (UserService aracılığıyla)
-        User user = userService.getUserById(projectRequest.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", projectRequest.getUserId()));
+        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+        User user = userService.getUserById(projectRequest.getUserId());
 
         // 2. DTO'dan Entity'ye dönüşüm
         Project project = projectMapper.toEntity(projectRequest);
         project.setUser(user); // İlişkili kullanıcıyı set et
+
+        // ProjectMapper'ınızın ProjectRequest'ten Project'e dönüşüm yaparken
+        // projectImageUrl alanını da doğru bir şekilde maplediğinden emin olun.
+        // Eğer mapper bunu otomatik yapmıyorsa, burada manuel olarak set etmeniz gerekebilir:
+        // project.setProjectImageUrl(projectRequest.getProjectImageUrl());
 
         // 3. Entity'yi kaydetme
         Project savedProject = projectRepository.save(project);
@@ -60,18 +65,19 @@ public class ProjectServiceImpl implements ProjectService {
                 .orElseThrow(() -> new ResourceNotFoundException("Proje", "ID", id));
 
         // 2. Kullanıcı ID'si değişiyorsa veya geçerli değilse kontrol et ve güncelle
-        // Not: Genellikle bir projenin kullanıcısı değişmez.
-        // Eğer bu iş kuralı ise, aşağıdaki if bloğunu kaldırabilirsiniz.
-        // Eğer değişebilir ve InvalidInputException fırlatmak istiyorsanız, onu da ekleyebilirsiniz.
         if (projectRequest.getUserId() != null &&
-            (existingProject.getUser() == null || !existingProject.getUser().getId().equals(projectRequest.getUserId()))) {
-            User newUser = userService.getUserById(projectRequest.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", projectRequest.getUserId()));
+                (existingProject.getUser() == null || !existingProject.getUser().getId().equals(projectRequest.getUserId()))) {
+            // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+            User newUser = userService.getUserById(projectRequest.getUserId());
             existingProject.setUser(newUser);
         }
 
         // 3. DTO'daki verileri mevcut Entity üzerine güncelleme
+        // ProjectMapper'ınızın updateEntityFromDto metodu ProjectRequest'ten Project'e dönüşüm yaparken
+        // projectImageUrl alanını da doğru bir şekilde güncellediğinden emin olun.
         projectMapper.updateEntityFromDto(projectRequest, existingProject);
+        // Eğer mapper bunu otomatik yapmıyorsa, burada manuel olarak set etmeniz gerekebilir:
+        // existingProject.setProjectImageUrl(projectRequest.getProjectImageUrl());
 
         // 4. Güncellenen Entity'yi kaydetme
         Project updatedProject = projectRepository.save(existingProject);
@@ -85,7 +91,7 @@ public class ProjectServiceImpl implements ProjectService {
         // 1. Projeyi bulma
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Proje", "ID", id));
-        
+
         // 2. Entity'den Response DTO'ya dönüşüm ve döndürme
         return projectMapper.toResponse(project);
     }
@@ -94,16 +100,17 @@ public class ProjectServiceImpl implements ProjectService {
     public List<ProjectResponse> getProjectsByUserId(Long userId) {
         // 1. Kullanıcının varlığını kontrol etme (iyi bir pratik)
         // Eğer kullanıcı yoksa, ona ait projeler de olamaz.
-        userService.getUserById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", userId));
+        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
+        userService.getUserById(userId);
 
         // 2. Kullanıcıya ait projeleri Repository'den çekme
-        List<Project> projects = projectRepository.findByUserId(userId);
+        // Project entity'sindeki User ilişkisi üzerinden sorgulama için findByUser_Id kullanıldı.
+        List<Project> projects = projectRepository.findByUser_Id(userId); // <-- Burası düzeltildi!
 
         // 3. Entity listesinden Response DTO listesine dönüşüm ve döndürme
         return projects.stream()
-                .map(projectMapper::toResponse) // Her bir Project'i ProjectResponse'a dönüştür
-                .collect(Collectors.toList()); // Listeye topla
+                .map(projectMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override

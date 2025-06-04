@@ -1,4 +1,14 @@
-<div class="app-container">
+<!-- src/app/app.component.html -->
+<div [class.dark-theme]="currentTheme === 'dark-theme'">
+  <!-- Tema değiştirme butonu -->
+  <button (click)="toggleTheme()" class="theme-toggle-button">
+    <i class="fas" [class.fa-sun]="currentTheme === 'dark-theme'" [class.fa-moon]="currentTheme === 'light-theme'"></i>
+    {{ currentTheme === 'dark-theme' ? 'Açık Tema' : 'Koyu Tema' }}
+  </button>
+
+  <!-- Ana Router Çıkışı -->
   <router-outlet></router-outlet>
+
+  <!-- Toast Mesajları -->
+  <app-toast></app-toast>
 </div>
-<app-toast></app-toast> 

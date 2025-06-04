@@ -34,6 +34,9 @@ public class Project {
 
     @Column(length = 255) // Max length
     private String technologies; // Technologies used (e.g., "Spring Boot, React, PostgreSQL")
+    
+    @Column(name = "project_image_url", length = 500) // YENİ: Proje görseli URL'si sütunu
+    private String projectImageUrl; // Proje görseli URL'si
 
     // Many-to-One relationship: Many projects can belong to one user
     // optional = false: This project must have an associated user

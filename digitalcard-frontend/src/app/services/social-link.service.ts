@@ -1,68 +1,71 @@
 // src/app/services/social-link.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { environment } from 'src/environments/environment'; // Doğrudan environment'ı import edin
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
-// DTO'larımızı tanımlayalım (Bunları daha sonra ayrı bir 'models' klasöründe de tutabiliriz)
-export interface SocialLinkRequest {
+// SocialLink Arayüzü (UserService ile aynı olmalı)
+export interface SocialLink {
+  id?: number; // Backend'den gelen ID'ler number
   platform: string;
   url: string;
-  userId: number; // Angular'da Long karşılığı number'dır
-}
-
-export interface SocialLinkResponse {
-  id: number;
-  platform: string;
-  url: string;
-  userId: number;
+  userId?: number; // userId de number
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class SocialLinkService {
-  private apiUrl = `${environment.apiUrl}/sociallinks`; // Backend'deki base URL
+  private apiUrl = `${environment.apiUrl}/social-links`;
 
   constructor(private http: HttpClient) { }
 
-  /**
-   * Belirli bir kullanıcıya ait tüm sosyal linkleri getirir.
-   * GET /api/sociallinks/user/{userId}
-   */
-  getSocialLinksByUserId(userId: number): Observable<SocialLinkResponse[]> {
-    return this.http.get<SocialLinkResponse[]>(`${this.apiUrl}/user/${userId}`);
+  getSocialLinksByUserId(userId: number): Observable<SocialLink[]> {
+    return this.http.get<SocialLink[]>(`${this.apiUrl}/user/${userId}`)
+      .pipe(
+        catchError(this.handleError)
+      );
   }
 
-  /**
-   * Belirli bir sosyal linki ID'sine göre getirir.
-   * GET /api/sociallinks/{id}
-   */
-  getSocialLinkById(id: number): Observable<SocialLinkResponse> {
-    return this.http.get<SocialLinkResponse>(`${this.apiUrl}/${id}`);
+  createSocialLink(socialLink: Omit<SocialLink, 'id'>): Observable<SocialLink> {
+    return this.http.post<SocialLink>(this.apiUrl, socialLink)
+      .pipe(
+        catchError(this.handleError)
+      );
   }
 
-  /**
-   * Yeni bir sosyal link oluşturur.
-   * POST /api/sociallinks
-   */
-  createSocialLink(socialLink: SocialLinkRequest): Observable<SocialLinkResponse> {
-    return this.http.post<SocialLinkResponse>(this.apiUrl, socialLink);
+  updateSocialLink(linkId: number, socialLink: Partial<SocialLink>): Observable<SocialLink> {
+    return this.http.put<SocialLink>(`${this.apiUrl}/${linkId}`, socialLink)
+      .pipe(
+        catchError(this.handleError)
+      );
   }
 
-  /**
-   * Mevcut bir sosyal linki günceller.
-   * PUT /api/sociallinks/{id}
-   */
-  updateSocialLink(id: number, socialLink: SocialLinkRequest): Observable<SocialLinkResponse> {
-    return this.http.put<SocialLinkResponse>(`${this.apiUrl}/${id}`, socialLink);
+  deleteSocialLink(linkId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${linkId}`)
+      .pipe(
+        catchError(this.handleError)
+      );
   }
 
-  /**
-   * Belirli bir sosyal linki siler.
-   * DELETE /api/sociallinks/{id}
-   */
-  deleteSocialLink(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  private handleError(error: HttpErrorResponse): Observable<never> {
+    let errorMessage = 'Bilinmeyen bir hata oluştu!';
+    if (error.error instanceof ErrorEvent) {
+      errorMessage = `Hata: ${error.error.message}`;
+    } else {
+      errorMessage = `Hata Kodu: ${error.status}\nMesaj: ${error.message || error.statusText}`;
+      if (error.status === 401) {
+        errorMessage = 'Kimlik doğrulama başarısız oldu veya oturum süresi doldu. Lütfen tekrar giriş yapın.';
+      } else if (error.status === 403) {
+        errorMessage = 'Bu işlemi yapmaya yetkiniz yok.';
+      } else if (error.status === 404) {
+        errorMessage = 'Kaynak bulunamadı.';
+      } else if (error.error && error.error.message) {
+        errorMessage = error.error.message;
+      }
+    }
+    console.error(errorMessage);
+    return throwError(() => new Error(errorMessage));
   }
-} 
+}

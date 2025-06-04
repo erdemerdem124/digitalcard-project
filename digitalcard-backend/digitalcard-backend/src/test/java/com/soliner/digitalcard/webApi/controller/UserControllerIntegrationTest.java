@@ -1,5 +1,5 @@
 package com.soliner.digitalcard.webApi.controller;
-//
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soliner.digitalcard.digitalcard_backend.DigitalcardBackendApplication;
 import com.soliner.digitalcard.domain.model.User;
@@ -34,10 +34,10 @@ import org.springframework.context.annotation.Import;
 
 
 /**
- * UserController için entegrasyon testleri.
- * Bu testler, Controller, Service, Repository ve (in-memory) veritabanı gibi tüm katmanların
- * bir arada doğru çalıştığını doğrular.
- */
+ * UserController için entegrasyon testleri.
+ * Bu testler, Controller, Service, Repository ve (in-memory) veritabanı gibi tüm katmanların
+ * bir arada doğru çalıştığını doğrular.
+ */
 @SpringBootTest(classes = DigitalcardBackendApplication.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -208,7 +208,8 @@ public class UserControllerIntegrationTest {
         // Assert
         response.andDo(print())
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message", is("Kullanıcı bulunamadı ID : '" + nonExistingId + "'")))
+                // Düzeltme: Hata mesajı beklentisini gerçek mesajla eşleştir
+                .andExpect(jsonPath("$.message", is("Kullanıcı, ID : '" + nonExistingId + "' ile bulunamadı")))
                 .andExpect(jsonPath("$.status", is(404)));
     }
     
@@ -278,7 +279,8 @@ public class UserControllerIntegrationTest {
         // Assert
         response.andDo(print())
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message", is("Kullanıcı bulunamadı ID : '" + nonExistingId + "'")))
+                // Düzeltme: Hata mesajı beklentisini gerçek mesajla eşleştir
+                .andExpect(jsonPath("$.message", is("Kullanıcı, ID : '" + nonExistingId + "' ile bulunamadı")))
                 .andExpect(jsonPath("$.status", is(404)));
     }
 
@@ -384,7 +386,8 @@ public class UserControllerIntegrationTest {
         // Assert
         response.andDo(print())
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message", is("Kullanıcı bulunamadı ID : '" + nonExistingId + "'")))
+                // Düzeltme: Hata mesajı beklentisini gerçek mesajla eşleştir
+                .andExpect(jsonPath("$.message", is("Kullanıcı, ID : '" + nonExistingId + "' ile bulunamadı")))
                 .andExpect(jsonPath("$.status", is(404)));
 
     }

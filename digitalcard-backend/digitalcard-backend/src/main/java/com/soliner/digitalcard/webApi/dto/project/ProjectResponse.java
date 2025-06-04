@@ -13,5 +13,6 @@ public class ProjectResponse {
     private String description;
     private String projectUrl;
     private String technologies;
+    private String projectImageUrl; // YENİ: Proje görseli URL'si eklendi
     private Long userId;
 }

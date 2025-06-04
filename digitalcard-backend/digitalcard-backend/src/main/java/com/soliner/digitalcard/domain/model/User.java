@@ -55,6 +55,19 @@ public class User {
     @Size(max = 255)
     private String profilePhotoUrl;
 
+    // BURAYA YENİ EKLENEN ALANLAR!
+    @Size(max = 100) // Unvan için uygun bir boyut
+    private String title;
+
+    @Size(max = 255) // Konum için uygun bir boyut
+    private String location;
+
+    @Size(max = 20) // Telefon numarası için uygun bir boyut
+    private String phone;
+
+    @Size(max = 255) // Portföy URL'si için uygun bir boyut
+    private String portfolioUrl;
+
     @ManyToMany(fetch = FetchType.EAGER) // Roller EAGER olarak yüklendi
     @JoinTable(name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),

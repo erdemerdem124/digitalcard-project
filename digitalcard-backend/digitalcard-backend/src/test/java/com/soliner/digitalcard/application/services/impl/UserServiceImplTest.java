@@ -262,7 +262,7 @@ public class UserServiceImplTest {
         });
 
         // Hata mesajını düzeltiyoruz
-        assertEquals("Kullanıcı bulunamadı ID : '" + userId + "'", thrown.getMessage());
+        assertEquals("Kullanıcı, ID : '" + userId + "' ile bulunamadı", thrown.getMessage()); // <-- DÜZELTME BURADA
         verify(userRepository, times(1)).findById(userId);
         verify(userRepository, never()).findByUsername(anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -302,16 +302,14 @@ public class UserServiceImplTest {
         when(userMapper.toResponse(userEntity)).thenReturn(expectedResponse);
 
         // Servis metodunu çağır
-        // userService.getUserById(userId) metodu Optional<User> döndürdüğü için,
-        // önce Optional'ı açıp ardından UserMapper ile UserResponse'a dönüştürüyoruz.
-        Optional<User> actualUserOptional = userService.getUserById(userId);
+        // Düzeltme: userService.getUserById(userId) artık doğrudan User döndürüyor
+        User actualUser = userService.getUserById(userId); // <-- BURADA DÜZELTME YAPILDI
 
         // Optional'ın dolu olduğunu ve içinde doğru User objesinin olduğunu doğrula
-        assertTrue(actualUserOptional.isPresent(), "User should be found");
-        User actualUser = actualUserOptional.get(); // Optional'ın içindeki User objesini al
+        assertNotNull(actualUser, "User should be found"); // <-- BURADA DÜZELTME YAPILDI
 
         // User objesini UserResponse'a dönüştür
-        UserResponse actualResponse = userMapper.toResponse(actualUser); // <-- Buradaki düzeltme!
+        UserResponse actualResponse = userMapper.toResponse(actualUser); // <-- BURADA DÜZELTME YAPILDI
 
         assertNotNull(actualResponse);
         assertEquals(expectedResponse.getId(), actualResponse.getId());
@@ -330,7 +328,7 @@ public class UserServiceImplTest {
             userService.getUserById(userId);
         });
         // Hata mesajını düzeltiyoruz
-        assertEquals("Kullanıcı bulunamadı ID : '" + userId + "'", thrown.getMessage());
+        assertEquals("Kullanıcı, ID : '" + userId + "' ile bulunamadı", thrown.getMessage()); // <-- DÜZELTME BURADA
         verify(userRepository, times(1)).findById(userId);
         verify(userMapper, never()).toResponse(any(User.class)); // Kullanıcı bulunamadığı için mapper çağrılmamalı
     }
@@ -388,6 +386,9 @@ public class UserServiceImplTest {
         });
 
         // Hata mesajını düzeltiyoruz
+        // ResourceNotFoundException'ın constructor'ı "resourceName", "fieldName", "fieldValue" alır
+        // ve mesajı "ResourceNotFoundException: Kaynak adı 'resourceName' Alan adı 'fieldName' Alan değeri 'fieldValue' ile bulunamadı" şeklinde oluşturur.
+        // Bu yüzden, sadece ResourceNotFoundException'ın fırlatıldığını ve parametrelerinin doğru olduğunu kontrol etmek daha iyidir.
         assertEquals("Kullanıcı", exception.getResourceName()); // Kaynak adı
         assertEquals("ID", exception.getFieldName());       // Alan adı
         assertEquals(userId, exception.getFieldValue());    // Alan değeri

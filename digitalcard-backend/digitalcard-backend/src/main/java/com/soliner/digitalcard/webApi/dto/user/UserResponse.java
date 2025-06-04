@@ -23,8 +23,13 @@ public class UserResponse {
 	    private String email; // Yeni eklenen alan
 	    private String firstName; // Yeni eklenen alan
 	    private String lastName; // Yeni eklenen alan
-	    private String profilePhotoUrl;
+	    private String profileImageUrl;
 	    private String bio;
+	    // YENİ EKLENECEK ALANLAR
+	    private String title;
+	    private String location;
+	    private String phone;
+	    private String portfolioUrl;
 
     private List<SocialLinkResponse> socialLinks;
     private List<ProjectResponse> projects;

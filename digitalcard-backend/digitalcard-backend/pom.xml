@@ -136,10 +136,10 @@
 
     <build>
         <plugins>
-            <plugin>
+           <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
+                <version>3.2.5</version> <configuration>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

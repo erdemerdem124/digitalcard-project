@@ -1,8 +1,16 @@
 // src/app/components/toast/toast.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ToastService, ToastMessage } from '../../services/toast.service';
+import { ToastService } from '../../services/toast.service'; // ToastMessage import'ı kaldırıldı
 import { Subscription } from 'rxjs';
+
+// ToastMessage arayüzü, ToastService içinde tanımlanmalı veya ayrı bir dosyada olmalı.
+// Şimdilik burada 'any' olarak varsayıyoruz, ancak toast.service.ts düzeltildiğinde daha spesifik bir tip kullanılacak.
+interface ToastMessage {
+  message: string;
+  type: 'success' | 'error' | 'info';
+  duration?: number;
+}
 
 @Component({
   selector: 'app-toast',
@@ -19,7 +27,9 @@ export class ToastComponent implements OnInit, OnDestroy {
   constructor(private toastService: ToastService) { }
 
   ngOnInit(): void {
-    this.toastSubscription = this.toastService.getToastMessages().subscribe(toast => {
+    // getToastMessages metodunun ToastService'te var olduğu varsayılıyor.
+    // ToastMessage tipini burada açıkça belirtmek TS7006 hatasını çözer.
+    this.toastSubscription = this.toastService.getToastMessages().subscribe((toast: ToastMessage | null) => {
       if (toast) {
         this.currentToast = toast;
         // Mevcut bir zamanlayıcı varsa temizle

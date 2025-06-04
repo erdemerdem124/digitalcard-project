@@ -88,9 +88,24 @@ public class SecurityConfig {
                 // Herkese açık endpoint'ler (kimlik doğrulama gerektirmez)
                 .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+
                 // Kullanıcı profili çekme endpoint'i için özel kural: Kimlik doğrulaması gerektirir
-                // Bu endpoint'in JwtAuthenticationFilter tarafından işlenmesi için permitAll olmamalı
                 .requestMatchers(HttpMethod.GET, "/api/users/username/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/users/{userId}").authenticated() // Kullanıcı profili güncelleme
+                .requestMatchers(HttpMethod.DELETE, "/api/users/{userId}").authenticated() // Kullanıcı hesabı silme
+
+                // YENİ EKLENEN KURAL: Sosyal linkler için endpoint'lere kimlik doğrulaması yapılmış kullanıcıların erişimine izin ver
+                .requestMatchers(HttpMethod.GET, "/api/sociallinks/user/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/sociallinks").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/sociallinks/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/sociallinks/**").authenticated()
+
+                // YENİ EKLENEN KURAL: Projeler için endpoint'lere kimlik doğrulaması yapılmış kullanıcıların erişimine izin ver
+                .requestMatchers(HttpMethod.GET, "/api/projects/user/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/projects").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/projects/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/api/projects/**").authenticated()
+
                 // Şifre güncelleme endpoint'i için özel kural: Kimlik doğrulaması gerektirir
                 .requestMatchers(HttpMethod.PUT, "/api/auth/users/{userId}/password").authenticated()
                 // Diğer tüm /api/auth/** endpoint'leri için kimlik doğrulama gerektir
