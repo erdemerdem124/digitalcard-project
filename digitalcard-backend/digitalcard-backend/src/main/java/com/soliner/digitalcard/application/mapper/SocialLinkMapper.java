@@ -3,37 +3,49 @@ package com.soliner.digitalcard.application.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
-import org.mapstruct.NullValuePropertyMappingStrategy; // Bu import'u ekleyin
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.Context; // Context için import
 
 import com.soliner.digitalcard.domain.model.SocialLink;
+import com.soliner.digitalcard.domain.model.User;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkRequest;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkResponse;
 
-/**
- * SocialLink Entity'si ile SocialLinkRequest ve SocialLinkResponse DTO'ları arasında dönüşüm sağlayan MapStruct Mapper arayüzü.
- */
+import java.util.List;
+
 @Mapper(componentModel = "spring",
-        // Null olan kaynak özelliklerinin hedef özelliklere maplenmesini engeller.
-        // Ancak nested property'ler için (user.id gibi) expression kullanmak daha güvenlidir.
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
 public interface SocialLinkMapper {
 
-    // SocialLinkRequest DTO'dan SocialLink Entity'ye dönüşüm
-    // ID otomatik oluşturulacak
+    // 🔥 KRİTİK EKLENTİ: UserServiceImpl'in ihtiyaç duyduğu tek parametreli toEntity metodu
+    // Bu metot, SocialLinkRequest'ten SocialLink entity'si oluşturur, ancak user ilişkisini
+    // manuel olarak servis katmanında kurulmasını bekler.
     @Mapping(target = "id", ignore = true)
-    // User ilişkisi servis katmanında set edilecek, bu yüzden burada ignore ediyoruz.
-    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "user", ignore = true) // User ilişkisi servis katmanında kurulacak
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     SocialLink toEntity(SocialLinkRequest socialLinkRequest);
 
-    // SocialLink Entity'den SocialLinkResponse DTO'ya dönüşüm
-    // user.id'yi userId'ye maplerken, user null ise NullPointerException almamak için kontrol ekle
-    @Mapping(target = "userId", expression = "java(socialLink.getUser() != null ? socialLink.getUser().getId() : null)")
+
+    // Mevcut çok parametreli toEntity metodu (örn. UserMapper'dan @Context ile çağrılabilir)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", expression = "java(user)")
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    SocialLink toEntity(SocialLinkRequest socialLinkRequest, @Context User user); // Bu metot hala burada kalabilir
+
+
+    @Mapping(source = "user.id", target = "userId")
     SocialLinkResponse toResponse(SocialLink socialLink);
 
-    // SocialLinkRequest DTO'daki verileri mevcut SocialLink Entity üzerine güncelleme
-    // ID güncellenmez
     @Mapping(target = "id", ignore = true)
-    // User ilişkisi servis katmanında yönetilir
     @Mapping(target = "user", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDto(SocialLinkRequest socialLinkRequest, @MappingTarget SocialLink socialLink);
+
+    List<SocialLinkResponse> toResponseList(List<SocialLink> socialLinks);
+    // 🔥 EKSİK OLAN METHOD: toEntityList (eğer doğrudan liste dönüşümü gerekiyorsa)
+    // Ancak UserServiceImpl'de stream().map(socialLinkMapper::toEntity) kullanıldığı için
+    // toEntityList metoduna doğrudan ihtiyacımız kalmıyor.
 }

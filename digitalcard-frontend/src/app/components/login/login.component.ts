@@ -28,7 +28,6 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {
     this.initForm();
-    // Başlangıçta login modunda olduğu için doğrulayıcıları ayarla
     this.setValidatorsByMode();
   }
 
@@ -43,19 +42,15 @@ export class LoginComponent implements OnInit {
     }, { validator: this.passwordMatchValidator });
   }
 
-  // Özel şifre eşleşme doğrulayıcısı
   passwordMatchValidator = (form: FormGroup) => {
     const password = form.get('password');
     const confirmPassword = form.get('confirmPassword');
 
-    // Eğer confirmPassword alanı yoksa veya login modundaysak, bu doğrulayıcıyı atla
-    // Bu, login modunda confirmPassword'ın form geçerliliğini etkilememesini sağlar.
     if (this.isLoginMode || !confirmPassword) {
-      confirmPassword?.setErrors(null); // Hata varsa temizle
+      confirmPassword?.setErrors(null);
       return null;
     }
 
-    // Eğer confirmPassword'da zaten başka bir hata varsa, bu doğrulayıcıyı çalıştırma
     if (confirmPassword.errors && !confirmPassword.errors['passwordsMismatch']) {
       return null;
     }
@@ -68,9 +63,7 @@ export class LoginComponent implements OnInit {
     return null;
   };
 
-
   setValidatorsByMode(): void {
-    // Tüm alanların doğrulayıcılarını temizle
     this.authForm.get('username')?.clearValidators();
     this.authForm.get('firstName')?.clearValidators();
     this.authForm.get('lastName')?.clearValidators();
@@ -81,9 +74,8 @@ export class LoginComponent implements OnInit {
     if (this.isLoginMode) {
       this.authForm.get('username')?.setValidators([Validators.required]);
       this.authForm.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
-      // Login modunda confirmPassword'ın hatalarını temizle
       this.authForm.get('confirmPassword')?.setErrors(null);
-    } else { // Kayıt modu
+    } else { // Register mode
       this.authForm.get('username')?.setValidators([Validators.required]);
       this.authForm.get('firstName')?.setValidators([Validators.required]);
       this.authForm.get('lastName')?.setValidators([Validators.required]);
@@ -92,7 +84,6 @@ export class LoginComponent implements OnInit {
       this.authForm.get('confirmPassword')?.setValidators([Validators.required]);
     }
 
-    // Doğrulayıcı değişikliklerini uygulamak için tüm form kontrollerinin geçerliliğini güncelle
     this.authForm.get('username')?.updateValueAndValidity();
     this.authForm.get('firstName')?.updateValueAndValidity();
     this.authForm.get('lastName')?.updateValueAndValidity();
@@ -100,45 +91,46 @@ export class LoginComponent implements OnInit {
     this.authForm.get('password')?.updateValueAndValidity();
     this.authForm.get('confirmPassword')?.updateValueAndValidity();
 
-    // Form grubunun doğrulayıcılarını da güncelle (passwordMatchValidator için)
     this.authForm.updateValueAndValidity();
   }
 
   toggleMode(): void {
     this.isLoginMode = !this.isLoginMode;
     this.errorMessage = '';
-    this.authForm.reset(); // Mod değiştiğinde formu sıfırla
-    this.setValidatorsByMode(); // Yeni moda göre doğrulayıcıları ayarla
+    this.authForm.reset();
+    this.setValidatorsByMode();
   }
 
   onSubmit(): void {
     this.errorMessage = '';
 
-    // Hata ayıklama için formun geçerlilik durumunu ve hatalarını logla
     console.log('Form geçerli mi:', this.authForm.valid);
     console.log('Form hataları:', this.authForm.errors);
-    console.log('Form değerleri:', this.authForm.value);
+    console.log('Form değerleri (geniş):', this.authForm.value);
+
     Object.keys(this.authForm.controls).forEach(key => {
       const control = this.authForm.get(key);
       console.log(`Kontrol: ${key}, Geçerli mi: ${control?.valid}, Hataları: ${control?.errors}, Dokunuldu mu: ${control?.touched}`);
     });
 
-
     if (this.authForm.invalid) {
       this.authForm.markAllAsTouched();
       this.toastService.error('Lütfen tüm gerekli alanları doğru şekilde doldurun.');
-      this.isLoading = false; // Hata durumunda isLoading'i false yap
+      this.isLoading = false;
       return;
     }
 
     this.isLoading = true;
 
-    const { username, firstName, lastName, email, password } = this.authForm.value;
+    // Sadece gerekli alanları al: username ve password
+    const { username, password } = this.authForm.value;
 
     if (this.isLoginMode) {
-      const usernameOrEmail = username;
+      // Backend'in beklediği 'username' alan adını kullanıyoruz.
+      const loginPayload = { username: username, password: password };
+      console.log('Login isteği için gönderilen payload:', loginPayload);
 
-      this.authService.login({ usernameOrEmail, password }).subscribe({
+      this.authService.login(loginPayload).subscribe({
         next: () => {
           this.isLoading = false;
           this.toastService.success('Başarıyla giriş yapıldı!');
@@ -146,11 +138,13 @@ export class LoginComponent implements OnInit {
         },
         error: (err: any) => {
           this.isLoading = false;
-          this.errorMessage = err.message || 'Giriş başarısız oldu.';
+          this.errorMessage = err.error?.message || err.message || 'Giriş başarısız oldu.';
           this.toastService.error(this.errorMessage);
         }
       });
     } else {
+      // Register için RegisterRequest arayüzüne uygun olarak tüm alanları gönder
+      const { firstName, lastName, email } = this.authForm.value;
       this.authService.register({ username, firstName, lastName, email, password }).subscribe({
         next: () => {
           this.isLoading = false;
@@ -159,7 +153,7 @@ export class LoginComponent implements OnInit {
         },
         error: (err: any) => {
           this.isLoading = false;
-          this.errorMessage = err.message || 'Kayıt başarısız oldu.';
+          this.errorMessage = err.error?.message || err.message || 'Kayıt başarısız oldu.';
           this.toastService.error(this.errorMessage);
         }
       });

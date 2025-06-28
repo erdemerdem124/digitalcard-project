@@ -1,29 +1,35 @@
 package com.soliner.digitalcard.webApi.dto.project;
-import lombok.Data;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty; // JsonProperty eklendi
 
-
-@Data // Lombok: Otomatik olarak getter, setter, equals, hashCode ve toString metodlarını oluşturur.
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class ProjectRequest {
-   @NotBlank(message = "Proje başlığı boş olamaz") // Proje başlığının boş veya sadece boşluklardan oluşmamasını sağlar.
-   @Size(max = 255, message = "Proje başlığı 255 karakterden uzun olamaz") // Proje başlığının maksimum uzunluğu.
-   private String title;
+    @NotBlank(message = "Title is required")
+    @Size(max = 100, message = "Title must be less than 100 characters")
+    private String title;
 
-   @Size(max = 2000, message = "Açıklama 2000 karakterden uzun olamaz") // Açıklama metninin maksimum uzunluğu.
-   private String description;
+    @Size(max = 1000, message = "Description must be less than 1000 characters")
+    private String description;
 
-   @Size(max = 500, message = "Proje URL'si 500 karakterden uzun olamaz") // Proje URL'sinin maksimum uzunluğu.
-   private String projectUrl;
+    // Frontend'den 'project_url' olarak gelmesini bekliyoruz
+    @JsonProperty("project_url")
+    @Size(max = 255, message = "Project URL must be less than 255 characters")
+    private String projectUrl; // Daha önce 'url' idi, Project entity'deki 'projectUrl' ile eşleşmesi için değiştirildi
 
-   @Size(max = 255, message = "Teknolojiler 255 karakterden uzun olamaz") // Kullanılan teknolojiler metninin maksimum uzunluğu.
-   private String technologies;
+    @Size(max = 255, message = "Technologies must be less than 255 characters")
+    private String technologies; // Yeni eklendi
 
-   @NotNull(message = "Kullanıcı ID'si boş olamaz") // Bu projenin hangi kullanıcıya ait olduğunu belirten kullanıcı ID'si. Boş olamaz.
-   private Long userId;
-   
-
-   @Size(max = 500, message = "Proje görseli URL'si 500 karakterden uzun olamaz") // YENİ: Proje görseli URL'sinin maksimum uzunluğu.
-   private String projectImageUrl; // YENİ: Proje görseli URL'si
+    // Frontend'den 'project_image_url' olarak gelmesini bekliyoruz
+    @JsonProperty("project_image_url")
+    @Size(max = 255, message = "Project image URL must be less than 255 characters")
+    private String projectImageUrl; // Yeni eklendi
 }

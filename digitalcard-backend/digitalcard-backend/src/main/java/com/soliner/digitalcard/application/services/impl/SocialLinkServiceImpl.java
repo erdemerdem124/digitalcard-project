@@ -3,24 +3,26 @@ package com.soliner.digitalcard.application.services.impl;
 import com.soliner.digitalcard.application.mapper.SocialLinkMapper;
 import com.soliner.digitalcard.application.services.interfaces.SocialLinkService;
 import com.soliner.digitalcard.application.services.interfaces.UserService;
+import com.soliner.digitalcard.core.types.exceptions.InvalidInputException;
 import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
 import com.soliner.digitalcard.domain.model.SocialLink;
-import com.soliner.digitalcard.domain.model.User; // User entity'sini import edin
+import com.soliner.digitalcard.domain.model.User;
 import com.soliner.digitalcard.persistence.repository.SocialLinkRepository;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkRequest;
 import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Collectors; // Eğer manuel stream kullanılıyorsa gerekli
 
 /**
- * SocialLinkService arayüzünün implementasyonu.
- * Sosyal Link iş mantığı operasyonlarını gerçekleştirir ve Repository aracılığıyla veri erişimi sağlar.
+ * Sosyal bağlantı yönetimi iş mantığını uygulayan servis sınıfı.
  * application katmanına aittir.
  */
 @Service
+@Slf4j
 public class SocialLinkServiceImpl implements SocialLinkService {
 
     private final SocialLinkRepository socialLinkRepository;
@@ -35,90 +37,105 @@ public class SocialLinkServiceImpl implements SocialLinkService {
 
     @Override
     @Transactional
-    public SocialLinkResponse createSocialLink(SocialLinkRequest request) {
-        // 1. Kullanıcıyı bulma (UserService aracılığıyla)
-        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
-        User user = userService.getUserById(request.getUserId()); 
+    public SocialLinkResponse createSocialLink(Long userId, SocialLinkRequest socialLinkRequest) {
+        log.info("createSocialLink metodu çağrıldı. Kullanıcı ID: {}", userId);
+        
+        // KRİTİK DÜZELTME: UserService'den User objesini doğru şekilde alıyoruz.
+        // userService.getUserById(userId) -> UserResponse döner
+        // UserResponse.getUsername() -> Kullanıcı adını verir
+        // userService.findByUsernameOrEmail() -> Optional<User> döner, var yok kontrolü ile User objesine ulaşılır.
+        User user = userService.findByUsernameOrEmail(userService.getUserById(userId).getUsername())
+                           .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", userId));
 
-        // 2. DTO'dan Entity'ye dönüşüm
-        SocialLink socialLink = socialLinkMapper.toEntity(request);
-        socialLink.setUser(user); // İlişkili kullanıcıyı set et
+        // Kullanıcının bu platformda zaten bir linki olup olmadığını kontrol et
+        if (socialLinkRepository.findByUserAndPlatform(user, socialLinkRequest.getPlatform()).isPresent()) {
+            log.warn("Kullanıcının zaten bu platformda bir sosyal linki var: {} - Kullanıcı ID: {}", socialLinkRequest.getPlatform(), userId);
+            throw new InvalidInputException("Platform", socialLinkRequest.getPlatform(), "Bu platformda bir sosyal linkiniz zaten mevcut.");
+        }
 
-        // 3. Entity'yi kaydetme
-        SocialLink savedLink = socialLinkRepository.save(socialLink);
-
-        // 4. Kaydedilen Entity'den Response DTO'ya dönüşüm ve döndürme
-        return socialLinkMapper.toResponse(savedLink);
+        // KRİTİK DÜZELTME: socialLinkMapper.toEntity metoduna 'user' objesi de gönderildi
+        SocialLink socialLink = socialLinkMapper.toEntity(socialLinkRequest, user);
+        // socialLink.setUser(user); // Mapper'da zaten yapıldığı için bu satır gereksiz hale geldi
+        SocialLink savedSocialLink = socialLinkRepository.save(socialLink);
+        log.info("Sosyal link başarıyla kaydedildi: {} - Kullanıcı ID: {}", savedSocialLink.getPlatform(), userId);
+        return socialLinkMapper.toResponse(savedSocialLink);
     }
 
     @Override
     @Transactional
-    public SocialLinkResponse updateSocialLink(Long id, SocialLinkRequest request) {
-        // 1. Mevcut sosyal linki bulma
-        SocialLink existingLink = socialLinkRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Sosyal Link", "ID", id));
+    public SocialLinkResponse updateSocialLink(Long userId, Long socialLinkId, SocialLinkRequest socialLinkRequest) {
+        log.info("updateSocialLink metodu çağrıldı. Kullanıcı ID: {}, Sosyal Link ID: {}", userId, socialLinkId);
+        
+        // KRİTİK DÜZELTME: UserService'den User objesini doğru şekilde alıyoruz.
+        User user = userService.findByUsernameOrEmail(userService.getUserById(userId).getUsername())
+                           .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı", "ID", userId));
 
-        // 2. Kullanıcı ID'si değişiyorsa veya geçerli değilse kontrol et ve güncelle
-        if (request.getUserId() != null &&
-                (existingLink.getUser() == null || !existingLink.getUser().getId().equals(request.getUserId()))) {
-            // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
-            User newUser = userService.getUserById(request.getUserId());
-            existingLink.setUser(newUser);
+        SocialLink existingSocialLink = socialLinkRepository.findById(socialLinkId)
+                .orElseThrow(() -> {
+                    log.warn("Güncellenecek sosyal link bulunamadı. Sosyal Link ID: {}", socialLinkId);
+                    return new ResourceNotFoundException("Sosyal Link", "ID", socialLinkId);
+                });
+
+        // Sosyal linkin doğru kullanıcıya ait olduğunu doğrula
+        if (!existingSocialLink.getUser().getId().equals(userId)) {
+            log.warn("Sosyal link, kullanıcıya ait değil. Sosyal Link ID: {}, Kullanıcı ID: {}", socialLinkId, userId);
+            throw new InvalidInputException("Yetkilendirme Hatası", "Bu sosyal link size ait değil veya erişim yetkiniz yok.");
         }
 
-        // 3. DTO'daki verileri mevcut Entity üzerine güncelleme
-        socialLinkMapper.updateEntityFromDto(request, existingLink);
+        // Platform değiştiyse ve yeni platformda başka bir link mevcutsa kontrol et
+        if (!existingSocialLink.getPlatform().equals(socialLinkRequest.getPlatform())) {
+            if (socialLinkRepository.findByUserAndPlatform(user, socialLinkRequest.getPlatform()).isPresent()) {
+                log.warn("Kullanıcının zaten bu platformda başka bir sosyal linki var: {} - Kullanıcı ID: {}", socialLinkRequest.getPlatform(), userId);
+                throw new InvalidInputException("Platform", socialLinkRequest.getPlatform(), "Bu platformda başka bir sosyal linkiniz zaten mevcut.");
+            }
+        }
 
-        // 4. Güncellenen Entity'yi kaydetme
-        SocialLink updatedLink = socialLinkRepository.save(existingLink);
-
-        // 5. Güncellenen Entity'den Response DTO'ya dönüşüm ve döndürme
-        return socialLinkMapper.toResponse(updatedLink);
+        socialLinkMapper.updateEntityFromDto(socialLinkRequest, existingSocialLink);
+        SocialLink updatedSocialLink = socialLinkRepository.save(existingSocialLink);
+        log.info("Sosyal link başarıyla güncellendi: {} - Kullanıcı ID: {}", updatedSocialLink.getPlatform(), userId);
+        return socialLinkMapper.toResponse(updatedSocialLink);
     }
 
     @Override
-    public SocialLinkResponse getSocialLinkById(Long id) {
-        // 1. Sosyal linki bulma
-        SocialLink socialLink = socialLinkRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Sosyal Link", "ID", id));
-
-        // 2. Entity'den Response DTO'ya dönüşüm ve döndürme
+    public SocialLinkResponse getSocialLinkById(Long socialLinkId) {
+        log.info("getSocialLinkById metodu çağrıldı. Sosyal Link ID: {}", socialLinkId);
+        SocialLink socialLink = socialLinkRepository.findById(socialLinkId)
+                .orElseThrow(() -> {
+                    log.warn("Sosyal link bulunamadı. Sosyal Link ID: {}", socialLinkId);
+                    return new ResourceNotFoundException("Sosyal Link", "ID", socialLinkId);
+                });
+        log.info("Sosyal link bulundu: {}", socialLink.getPlatform());
         return socialLinkMapper.toResponse(socialLink);
     }
 
     @Override
-    public List<SocialLinkResponse> getSocialLinksByUserId(Long userId) {
-        // 1. Kullanıcının varlığını kontrol etme (iyi bir pratik)
-        // Eğer kullanıcı yoksa, ona ait linkler de olamaz.
-        // getUserById zaten ResourceNotFoundException fırlattığı için .orElseThrow() burada gerekli değil.
-        userService.getUserById(userId);
-
-        // 2. Kullanıcıya ait sosyal linkleri Repository'den çekme
-        // SocialLink entity'nizdeki User ilişkisi üzerinden sorgulama için findByUser_Id kullanın.
-        List<SocialLink> socialLinks = socialLinkRepository.findByUser_Id(userId);
-
-        // 3. Entity listesinden Response DTO listesine dönüşüm ve döndürme
-        return socialLinks.stream()
-                .map(socialLinkMapper::toResponse)
-                .collect(Collectors.toList());
+    public List<SocialLinkResponse> getAllSocialLinksByUserId(Long userId) {
+        log.info("getAllSocialLinksByUserId metodu çağrıldı. Kullanıcı ID: {}", userId);
+        // Kullanıcının varlığını kontrol et (userService.getUserById zaten ResourceNotFoundException fırlatır)
+        userService.getUserById(userId); 
+        List<SocialLink> socialLinks = socialLinkRepository.findByUserId(userId);
+        // KRİTİK DÜZELTME: Mapper'daki toResponseList metodunu kullanıyoruz
+        List<SocialLinkResponse> socialLinkResponses = socialLinkMapper.toResponseList(socialLinks);
+        log.info("Kullanıcı ID {} için {} sosyal link bulundu.", userId, socialLinkResponses.size());
+        return socialLinkResponses;
     }
 
     @Override
     @Transactional
-    public void deleteSocialLink(Long id) {
-        // 1. Sosyal linkin varlığını kontrol etme
-        if (!socialLinkRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Sosyal Link", "ID", id);
-        }
-        // 2. Sosyal linki silme
-        socialLinkRepository.deleteById(id);
-    }
+    public void deleteSocialLink(Long userId, Long socialLinkId) {
+        log.info("deleteSocialLink metodu çağrıldı. Kullanıcı ID: {}, Sosyal Link ID: {}", userId, socialLinkId);
+        SocialLink socialLink = socialLinkRepository.findById(socialLinkId)
+                .orElseThrow(() -> {
+                    log.warn("Silinecek sosyal link bulunamadı. Sosyal Link ID: {}", socialLinkId);
+                    return new ResourceNotFoundException("Sosyal Link", "ID", socialLinkId);
+                });
 
-    // Arayüze eklediğimiz getAllSocialLinks() metodu için implementasyon
-    @Override
-    public List<SocialLinkResponse> getAllSocialLinks() {
-        return socialLinkRepository.findAll().stream()
-                .map(socialLinkMapper::toResponse)
-                .collect(Collectors.toList());
+        if (!socialLink.getUser().getId().equals(userId)) {
+            log.warn("Sosyal link, kullanıcıya ait değil. Sosyal Link ID: {}, Kullanıcı ID: {}", socialLinkId, userId);
+            throw new InvalidInputException("Yetkilendirme Hatası", "Bu sosyal link size ait değil veya silme yetkiniz yok.");
+        }
+        
+        socialLinkRepository.delete(socialLink);
+        log.info("Sosyal link başarıyla silindi: {} - Kullanıcı ID: {}", socialLink.getPlatform(), userId);
     }
 }

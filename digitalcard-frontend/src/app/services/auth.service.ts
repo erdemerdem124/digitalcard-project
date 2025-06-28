@@ -28,8 +28,9 @@ export interface User {
 }
 
 // Giriş işlemi için kimlik bilgileri arayüzü
+// KRİTİK DÜZELTME: 'usernameOrEmail' yerine 'username' olarak değiştirildi
 export interface LoginCredentials {
-  usernameOrEmail: string;
+  username: string; // Backend'in LoginRequest DTO'sundaki alan adı ile eşleşiyor
   password: string;
 }
 
@@ -114,6 +115,7 @@ export class AuthService {
       headers: new HttpHeaders({ 'Content-Type': 'application/json' })
     };
     
+    // credentials objesi zaten LoginCredentials arayüzüne (yani { username, password } yapısına) uygun
     return this.http.post<AuthResponse>(AUTH_API + 'login', credentials, httpOptions).pipe(
       map(response => {
         const user: User = {
@@ -138,6 +140,7 @@ export class AuthService {
         this.currentUserSubject.next(null);
         this.clearLocalStorage();
         console.warn('AuthService: Giriş hatası nedeniyle localStorage temizlendi.');
+        // error.error?.message, backend'den gelen custom hata mesajını almak için kullanılır.
         const errorMessage = error.error?.message || error.message || 'Giriş başarısız oldu. Lütfen kullanıcı adı/e-posta ve şifrenizi kontrol edin.';
         this.toastService.error(errorMessage);
         return throwError(() => new Error(errorMessage));

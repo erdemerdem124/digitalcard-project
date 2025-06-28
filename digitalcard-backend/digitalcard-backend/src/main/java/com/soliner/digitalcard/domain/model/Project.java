@@ -1,46 +1,63 @@
-package com.soliner.digitalcard.domain.model; 
+package com.soliner.digitalcard.domain.model;
 
-import jakarta.persistence.*; // JPA annotations
-import lombok.AllArgsConstructor; // Lombok: All-args constructor
-import lombok.Builder; // Lombok: Builder pattern
-import lombok.Data; // Lombok: Getters, Setters, etc.
-import lombok.NoArgsConstructor; // Lombok: No-args constructor
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;           // Bu import olmalı
+import lombok.Setter;           // Bu import olmalı
+import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode; // Bu import olmalı
+import lombok.ToString;         // Bu import olmalı
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
 
 /**
- * Project entity representing a user's project.
- * Maps to the 'projects' table in the database.
- * Belongs to the domain layer.
+ * Proje bilgilerini temsil eden JPA Entity sınıfı.
+ * Veritabanındaki 'projects' tablosuna maplenir.
  */
-@Entity // Specifies that this class is a JPA entity
-@Table(name = "projects") // Specifies the table name in the database
-@Data // Lombok: Generates getters, setters, equals, hashCode, and toString methods
-@NoArgsConstructor // Lombok: Generates a no-argument constructor
-@AllArgsConstructor // Lombok: Generates a constructor with all arguments
-@Builder // Lombok: Generates a builder pattern for object creation
+@Entity
+@Table(name = "projects", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "title"})
+})
+@Getter // Tüm alanlar için getter metotları üretir
+@Setter // Tüm alanlar için setter metotları üretir
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@EqualsAndHashCode(exclude = {"user"}) // KRİTİK: user ilişkisini equals/hashCode'dan hariç tut
+@ToString(exclude = {"user"})         // KRİTİK: user ilişkisini toString'den hariç tut
 public class Project {
 
-    @Id // Specifies the primary key
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // Specifies auto-increment for the ID
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100) // Not null and max length
-    private String title; // Project title
+    // Many-to-One ilişkisi: Birçok proje bir kullanıcıya ait olabilir.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user; // Projenin sahibi olan kullanıcı
 
-    @Column(length = 1000) // Max length
-    private String description; // Project description
+    @Column(nullable = false)
+    private String title;
 
-    @Column(length = 255) // Max length
-    private String projectUrl; // Live URL or repository URL of the project
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
-    @Column(length = 255) // Max length
-    private String technologies; // Technologies used (e.g., "Spring Boot, React, PostgreSQL")
-    
-    @Column(name = "project_image_url", length = 500) // YENİ: Proje görseli URL'si sütunu
-    private String projectImageUrl; // Proje görseli URL'si
+    @Column(name = "project_url")
+    private String projectUrl;
 
-    // Many-to-One relationship: Many projects can belong to one user
-    // optional = false: This project must have an associated user
-    @ManyToOne(fetch = FetchType.LAZY) // Lazy loading for performance
-    @JoinColumn(name = "user_id", nullable = false) // Specifies the foreign key column in the database
-    private User user; // Associated User entity
+    private String technologies;
+
+    @Column(name = "project_image_url")
+    private String projectImageUrl;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

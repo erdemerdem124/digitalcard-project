@@ -1,9 +1,9 @@
 // src/app/components/profile-edit/profile-edit.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, FormArray, ReactiveFormsModule } from '@angular/forms'; // ReactiveFormsModule import edildi
+import { FormBuilder, FormGroup, Validators, FormArray, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { UserService, UserProfile, SocialLink, Project } from '../../services/user.service';
+import { UserService, UserProfile, SocialLink, Project, UserRequestDTO } from '../../services/user.service';
 import { AuthService, User, PasswordUpdateRequest } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Subscription } from 'rxjs';
@@ -12,9 +12,9 @@ import { ThemeService, Theme } from '../../services/theme.service';
 @Component({
   selector: 'app-profile-edit',
   standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule], // ReactiveFormsModule eklendi
+  imports: [CommonModule, RouterModule, ReactiveFormsModule],
   templateUrl: './profile-edit.component.html',
-  styleUrl: './profile-edit.component.scss' // Düzeltildi
+  styleUrl: './profile-edit.component.scss'
 })
 export class ProfileEditComponent implements OnInit, OnDestroy {
   profileForm!: FormGroup;
@@ -53,14 +53,16 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
       email: [{ value: '', disabled: true }, [Validators.required, Validators.email]],
       bio: [''],
       title: [''],
-      // company: [''], // Şirket alanı kaldırıldı
-      phoneNumber: [''],
-      website: [''],
-      address: [''], // Adres alanı Konum olarak kullanılacak
+      // KRİTİK DÜZELTME: phoneNumber yerine phone
+      phone: [''],
+      // KRİTİK DÜZELTME: website yerine portfolioUrl
+      portfolioUrl: [''],
+      // KRİTİK DÜZELTME: address yerine location
+      location: [''],
       socialLinks: this.fb.array([]),
       projects: this.fb.array([]),
       currentPassword: [''],
-      newPassword: ['', Validators.minLength(6)],
+      newPassword: ['', Validators.minLength(8)],
       confirmNewPassword: ['']
     }, { validator: this.newPasswordMatchValidator });
 
@@ -80,6 +82,11 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     const newPassword = form.get('newPassword');
     const confirmNewPassword = form.get('confirmNewPassword');
 
+    if (!newPassword?.value && !confirmNewPassword?.value) {
+      confirmNewPassword?.setErrors(null);
+      return null;
+    }
+
     if (newPassword?.value && confirmNewPassword?.value && newPassword.value !== confirmNewPassword.value) {
       confirmNewPassword.setErrors({ newPasswordsMismatch: true });
     } else {
@@ -93,6 +100,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     this.profileSubscription = this.userService.getUserProfileByUsername(username).subscribe({
       next: (profile) => {
         this.userProfile = profile;
+        console.log('DEBUG (profile-edit): Yüklenen profil (frontend formatı):', profile);
         this.profileForm.patchValue({
           profileImageUrl: profile.profileImageUrl || '',
           firstName: profile.firstName,
@@ -101,20 +109,22 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
           email: profile.email,
           bio: profile.bio || '',
           title: profile.title || '',
-          // company: profile.company || '', // Şirket alanı kaldırıldı
-          phoneNumber: profile.phoneNumber || '',
-          website: profile.website || '',
-          address: profile.address || ''
+          // KRİTİK DÜZELTME: phoneNumber yerine phone
+          phone: profile.phone || '',
+          // KRİTİK DÜZELTME: website yerine portfolioUrl
+          portfolioUrl: profile.portfolioUrl || '',
+          // KRİTİK DÜZELTME: address yerine location
+          location: profile.location || ''
         });
 
-        this.setSocialLinks(profile.socialLinks);
-        this.setProjects(profile.projects);
+        this.setSocialLinks(profile.socialLinks || []);
+        this.setProjects(profile.projects || []);
         this.isLoading = false;
       },
       error: (err: any) => {
         console.error('Error loading user profile:', err);
-        this.errorMessage = 'Profil yüklenirken bir hata oluştu veya profiliniz bulunamadı. Lütfen bir profil oluşturun.';
-        this.userProfile = null; // Profil yüklenemediğinde userProfile null kalır
+        this.errorMessage = err.message || 'Profil yüklenirken bir hata oluştu veya profiliniz bulunamadı. Lütfen bir profil oluşturun.';
+        this.userProfile = null;
         this.isLoading = false;
       }
     });
@@ -151,10 +161,11 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
 
   addProject(): void {
     this.projectsFormArray.push(this.fb.group({
-      name: ['', Validators.required],
+      title: ['', Validators.required],
       description: [''],
-      technologies: [''], // Başlangıçta boş string
-      url: ['']
+      technologies: [''],
+      projectUrl: [''],
+      projectImageUrl: ['']
     }));
   }
 
@@ -166,52 +177,57 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     this.projectsFormArray.clear();
     projects.forEach(project => {
       this.projectsFormArray.push(this.fb.group({
-        name: [project.name, Validators.required],
+        title: [project.title, Validators.required],
         description: [project.description || ''],
-        technologies: [project.technologies?.join(', ') || ''], // Array'i string'e çevir
-        url: [project.url || '']
+        technologies: [project.technologies || ''],
+        projectUrl: [project.projectUrl || ''],
+        projectImageUrl: [project.projectImageUrl || '']
       }));
     });
   }
 
   onSubmit(): void {
     this.errorMessage = '';
+    
     if (this.profileForm.invalid) {
       this.profileForm.markAllAsTouched();
       this.toastService.error('Lütfen tüm gerekli alanları doğru şekilde doldurun.');
       return;
     }
-
-    this.isLoading = true;
     const formValue = this.profileForm.getRawValue();
 
-    const updatedProfile: UserProfile = {
-      id: this.userProfile?.id || 0,
-      userId: this.currentUser?.id || 0,
-      profileImageUrl: formValue.profileImageUrl,
-      firstName: formValue.firstName,
-      lastName: formValue.lastName,
+    this.isLoading = true;
+
+    const updatedProfile: UserRequestDTO = {
       username: formValue.username,
       email: formValue.email,
+      firstName: formValue.firstName,
+      lastName: formValue.lastName,
+      profileImageUrl: formValue.profileImageUrl,
       bio: formValue.bio,
       title: formValue.title,
-      // company: formValue.company, // Şirket alanı kaldırıldı
-      phoneNumber: formValue.phoneNumber,
-      website: formValue.website,
-      address: formValue.address,
+      phone: formValue.phone,
+      portfolioUrl: formValue.portfolioUrl,
+      location: formValue.location,
       socialLinks: formValue.socialLinks,
       projects: formValue.projects.map((p: any) => ({
-        ...p,
-        technologies: p.technologies ? p.technologies.split(',').map((tech: string) => tech.trim()) : [] // String'i Array'e çevir
+        title: p.title,
+        description: p.description,
+        technologies: p.technologies || '',
+        projectUrl: p.projectUrl,
+        projectImageUrl: p.projectImageUrl
       }))
     };
 
-    if (this.userProfile?.id) { // Eğer profil ID'si varsa, güncelleme yap
+    console.log('DEBUG (profile-edit): UserService\'e gönderilecek profil objesi:', updatedProfile);
+
+    if (this.userProfile?.id) {
       this.userService.updateUserProfile(this.userProfile.id, updatedProfile).subscribe({
         next: (profile) => {
           this.userProfile = profile;
           this.toastService.success('Profil başarıyla güncellendi!');
           this.isLoading = false;
+          console.log('DEBUG (profile-edit): Profil başarıyla güncellendi. Yeni profil objesi:', profile);
           this.router.navigate(['/home']);
         },
         error: (err: any) => {
@@ -221,21 +237,9 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
           this.isLoading = false;
         }
       });
-    } else { // Eğer profil ID'si yoksa, yeni profil oluştur
-      this.userService.createUserProfile(updatedProfile).subscribe({
-        next: (profile) => {
-          this.userProfile = profile;
-          this.toastService.success('Profil başarıyla oluşturuldu!');
-          this.isLoading = false;
-          this.router.navigate(['/home']);
-        },
-        error: (err: any) => {
-          console.error('Profil oluşturma hatası:', err);
-          this.errorMessage = err.error?.message || err.message || 'Profil oluşturulurken bir hata oluştu.';
-          this.toastService.error(this.errorMessage);
-          this.isLoading = false;
-        }
-      });
+    } else {
+      this.toastService.error('Mevcut profiliniz bulunamadı. Lütfen giriş yapın veya kayıt olun.');
+      this.isLoading = false;
     }
   }
 
@@ -245,7 +249,7 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
     const confirmNewPassword = this.profileForm.get('confirmNewPassword')?.value;
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      this.toastService.error('Lütfen mevcut şifrenizi, yeni şifrenizi ve yeni şifre onayını doldurun.');
+      this.toastService.error('Lütfen tüm şifre alanlarını doldurun.');
       return;
     }
 
@@ -254,8 +258,12 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (newPassword.length < 6) {
-      this.toastService.error('Yeni şifre en az 6 karakter olmalıdır.');
+    if (newPassword.length < 8) {
+      this.toastService.error('Yeni şifre en az 8 karakter olmalıdır.');
+      return;
+    }
+    if (!currentPassword && (newPassword || confirmNewPassword)) {
+      this.toastService.error('Mevcut şifrenizi girmeniz gerekmektedir.');
       return;
     }
 
@@ -268,9 +276,12 @@ export class ProfileEditComponent implements OnInit, OnDestroy {
             newPassword: '',
             confirmNewPassword: ''
           });
+          this.toastService.success('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.');
         },
         error: (err: any) => {
           console.error('Şifre güncelleme hatası:', err);
+          const errorMessage = err.error?.message || err.message || 'Şifre güncelleme başarısız oldu.';
+          this.toastService.error(errorMessage);
         }
       });
     } else {

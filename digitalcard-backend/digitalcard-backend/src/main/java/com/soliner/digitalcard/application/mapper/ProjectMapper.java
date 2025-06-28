@@ -3,43 +3,57 @@ package com.soliner.digitalcard.application.mapper;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.Context;
 
 import com.soliner.digitalcard.domain.model.Project;
-import com.soliner.digitalcard.webApi.dto.project.ProjectRequest; // BURASI GÜNCELLENDİ
-import com.soliner.digitalcard.webApi.dto.project.ProjectResponse; // BURASI GÜNCELLENDİ
+import com.soliner.digitalcard.domain.model.User;
+import com.soliner.digitalcard.webApi.dto.project.ProjectRequest;
+import com.soliner.digitalcard.webApi.dto.project.ProjectResponse;
 
-/**
- * Project Entity'si ile ProjectRequest ve ProjectResponse DTO'ları arasında dönüşüm sağlayan MapStruct Mapper arayüzü.
- * MapStruct, bu arayüzden derleme zamanında otomatik olarak implementasyon oluşturur.
- */
-@Mapper(componentModel = "spring") // Spring bileşeni olarak MapStruct'ın otomatik implementasyonunu sağlar
+import java.util.List;
+
+@Mapper(componentModel = "spring",
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
 public interface ProjectMapper {
 
-    /**
-     * ProjectRequest DTO'sunu Project Entity'sine dönüştürür.
-     * userId alanını Project Entity'sinin user objesine map'ler.
-     * @param projectRequest Dönüştürülecek ProjectRequest nesnesi.
-     * @return Dönüştürülmüş Project Entity nesnesi.
-     */
-    @Mapping(source = "userId", target = "user.id") // userId'yi User Entity'sinin id'sine mapler
+    // 🔥 KRİTİK EKLENTİ: UserServiceImpl'in ihtiyaç duyduğu tek parametreli toEntity metodu
+    // Bu metot, ProjectRequest'ten Project entity'si oluşturur, ancak user ilişkisini
+    // manuel olarak servis katmanında kurulmasını bekler.
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", ignore = true) // User ilişkisi servis katmanında kurulacak
+    @Mapping(source = "projectImageUrl", target = "projectImageUrl") // DTO'dan Entity'e aynı isimle mapleniyorsa açıkça belirtmek daha iyi
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     Project toEntity(ProjectRequest projectRequest);
 
-    /**
-     * Project Entity'sini ProjectResponse DTO'suna dönüştürür.
-     * user objesindeki id'yi ProjectResponse'un userId alanına map'ler.
-     * @param project Dönüştürülecek Project Entity nesnesi.
-     * @return Dönüştürülmüş ProjectResponse DTO nesnesi.
-     */
-    @Mapping(source = "user.id", target = "userId") // User objesindeki id'yi userId'ye mapler
+
+    // Mevcut çok parametreli toEntity metodu (örn. UserMapper'dan @Context ile çağrılabilir)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", expression = "java(user)")
+    @Mapping(source = "projectImageUrl", target = "projectImageUrl") // DTO'dan Entity'e
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    Project toEntity(ProjectRequest projectRequest, @Context User user);
+
+
+    @Mapping(source = "user.id", target = "userId")
+    // KRİTİK DÜZELTME: projectImageUrl zaten Project entity'sinde de aynı isimde olmalı,
+    // o yüzden source ve target'ı ayrı ayrı belirtmek yerine doğrudan bırakılabilir.
+    // Eğer entity'de farklı bir isimdeyse, source'u entity'deki ismiyle belirtin.
+    // Şimdiki haliyle Project entity'sinde de 'projectImageUrl' olduğunu varsayıyoruz.
     ProjectResponse toResponse(Project project);
 
-    /**
-     * ProjectRequest DTO'sundaki verileri mevcut bir Project Entity nesnesine günceller.
-     * ID ve user (ilişkili kullanıcı) alanlarının güncellenmemesini sağlar.
-     * @param projectRequest Güncelleme verilerini içeren ProjectRequest nesnesi.
-     * @param project Güncellenecek mevcut Project Entity nesnesi.
-     */
-    @Mapping(target = "id", ignore = true) // ID'nin güncellenmemesini sağlar
-    @Mapping(target = "user", ignore = true) // İlişkili user objesinin doğrudan güncellenmemesini sağlar
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(source = "projectImageUrl", target = "projectImageUrl") // DTO'dan Entity'ye
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     void updateEntityFromDto(ProjectRequest projectRequest, @MappingTarget Project project);
+
+    List<ProjectResponse> toResponseList(List<Project> projects);
+
+    // 🔥 EKSİK OLAN METOT: LIST DÖNÜŞÜMÜ (Artık ihtiyacımız yok çünkü stream().map() kullanıyoruz)
+    // toEntityList(List<ProjectRequest> projectRequests, @Context User user); // Bu metodu kaldırdık
 }

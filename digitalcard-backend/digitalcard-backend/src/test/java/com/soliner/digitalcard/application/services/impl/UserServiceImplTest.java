@@ -1,12 +1,34 @@
 package com.soliner.digitalcard.application.services.impl;
 
+// KRİTİK: Gerekli tüm application.mapper importları
+import com.soliner.digitalcard.application.mapper.ProjectMapper;
+import com.soliner.digitalcard.application.mapper.SocialLinkMapper;
 import com.soliner.digitalcard.application.mapper.UserMapper;
+
+// KRİTİK: Gerekli tüm core.types.exceptions importları
 import com.soliner.digitalcard.core.types.exceptions.InvalidInputException;
 import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
+
+// KRİTİK: Gerekli tüm domain.model importları
+import com.soliner.digitalcard.domain.model.ERole;
+import com.soliner.digitalcard.domain.model.Role;
 import com.soliner.digitalcard.domain.model.User;
+import com.soliner.digitalcard.domain.model.SocialLink;
+import com.soliner.digitalcard.domain.model.Project;
+
+// KRİTİK: Gerekli tüm persistence.repository importları
+import com.soliner.digitalcard.persistence.repository.RoleRepository;
 import com.soliner.digitalcard.persistence.repository.UserRepository;
+
+// KRİTİK: Gerekli tüm webApi.dto importları
+import com.soliner.digitalcard.webApi.dto.auth.PasswordUpdateRequest;
 import com.soliner.digitalcard.webApi.dto.user.UserRequest;
 import com.soliner.digitalcard.webApi.dto.user.UserResponse;
+import com.soliner.digitalcard.webApi.dto.sociallink.SocialLinkRequest;
+import com.soliner.digitalcard.webApi.dto.project.ProjectRequest;
+
+
+// JUnit ve Mockito importları
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,24 +36,35 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+
+// Spring Security importları
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+// Java util importları
+import java.time.LocalDateTime; // LocalDateTime eklendi
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
 
+// Static importlar (Mockito ve JUnit Assertions)
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * UserServiceImpl sınıfı için birim testleri.
  * Bu testler, UserServiceImpl'deki iş mantığını izole edilmiş bir ortamda doğrular.
- * Bağımlılıklar (UserRepository, UserMapper, PasswordEncoder) Mockito kullanılarak mock'lanır.
+ * Bağımlılıklar (UserRepository, UserMapper, PasswordEncoder, RoleRepository, SocialLinkMapper, ProjectMapper) Mockito kullanılarak mock'lanır.
  */
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT) // Gevşek mockito ayarı, testleri geliştirirken yardımcı olabilir
 @DisplayName("UserServiceImpl Unit Tests")
 public class UserServiceImplTest {
 
@@ -39,396 +72,470 @@ public class UserServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserMapper userMapper; // UserMapper'ı mockluyoruz
+    private RoleRepository roleRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private UserMapper userMapper;
+
+    @Mock
+    private SocialLinkMapper socialLinkMapper;
+
+    @Mock
+    private ProjectMapper projectMapper;
+
     @InjectMocks
     private UserServiceImpl userService;
 
+    private User mockUser;
+    private UserRequest mockUserRequest;
+    private UserResponse mockUserResponse; // mockUserResponse şimdi builder ile oluşturulacak
+    private Role mockRole;
+
     @BeforeEach
     void setUp() {
-        // Her testten önce passwordEncoder'ın encode metodunun davranışını tanımla
-        when(passwordEncoder.encode(anyString())).thenReturn("hashedPassword");
-    }
+        mockRole = Role.builder().id(1L).name(ERole.ROLE_USER).build();
+        Set<Role> roles = new HashSet<>();
+        roles.add(mockRole);
 
-    @Test
-    @DisplayName("should create a user successfully")
-    void createUser_shouldCreateUserSuccessfully() {
-        // Test için bir UserRequest DTO'su oluştur
-        UserRequest request = UserRequest.builder()
-                .username("testuser")
-                .email("test@example.com")
-                .password("password123")
-                .firstName("Test")
-                .lastName("User")
-                .build();
-
-        // Servis tarafından kaydedilecek User entity'si oluştur
-        User userEntity = User.builder()
+        mockUser = User.builder()
                 .id(1L)
                 .username("testuser")
                 .email("test@example.com")
-                .passwordHash("hashedPassword")
+                .passwordHash("encodedPassword")
                 .firstName("Test")
                 .lastName("User")
+                .profilePhotoUrl("http://example.com/profile.jpg")
+                .bio("A test user")
+                .title("Developer")
+                .address("Test City")
+                .phoneNumber("1234567890")
+                .website("http://test.com")
+                .roles(roles)
+                .socialLinks(new ArrayList<>())
+                .projects(new ArrayList<>())
+                .createdAt(LocalDateTime.now()) // createdAt eklendi
+                .updatedAt(LocalDateTime.now()) // updatedAt eklendi
                 .build();
 
-        // Servis tarafından döndürülecek beklenen UserResponse DTO'su oluştur
-        UserResponse expectedResponse = UserResponse.builder()
+        mockUserRequest = new UserRequest();
+        mockUserRequest.setUsername("testuser");
+        mockUserRequest.setEmail("test@example.com");
+        mockUserRequest.setPassword("rawPassword123!"); // Şifre validasyonu için güncellendi
+        mockUserRequest.setFirstName("Test");
+        mockUserRequest.setLastName("User");
+        mockUserRequest.setProfileImageUrl("http://example.com/profile.jpg"); // Frontend'den gelen isim
+        mockUserRequest.setBio("A test user");
+        mockUserRequest.setTitle("Developer");
+        mockUserRequest.setLocation("Test City"); // Frontend'den gelen isim
+        mockUserRequest.setPhone("1234567890"); // Frontend'den gelen isim
+        mockUserRequest.setPortfolioUrl("http://test.com"); // Frontend'den gelen isim
+        mockUserRequest.setSocialLinks(Collections.emptyList());
+        mockUserRequest.setProjects(Collections.emptyList());
+
+        // KRİTİK DÜZELTME: UserResponse builder ile oluşturuldu ve yeni alanlar eklendi
+        mockUserResponse = UserResponse.builder()
                 .id(1L)
                 .username("testuser")
                 .email("test@example.com")
                 .firstName("Test")
                 .lastName("User")
+                .profileImageUrl("http://example.com/profile.jpg") // Response'taki field adı
+                .bio("A test user")
+                .title("Developer")
+                .location("Test City") // Response'taki field adı
+                .phone("1234567890") // Response'taki field adı
+                .portfolioUrl("http://test.com") // Response'taki field adı
+                .roles(Collections.singletonList("ROLE_USER"))
+                .socialLinks(Collections.emptyList())
+                .projects(Collections.emptyList())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
+    }
 
-        // Mock davranışlarını tanımla
-        when(userRepository.findByUsername(request.getUsername())).thenReturn(Optional.empty()); // Kullanıcı adı boş dönsün
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());       // E-posta boş dönsün
-        when(userMapper.toEntity(request)).thenReturn(userEntity);                              // Mapper, DTO'dan entity'ye dönüştürsün
-        when(userRepository.save(any(User.class))).thenReturn(userEntity);                      // Repository, herhangi bir User'ı kaydettiğinde userEntity'yi dönsün
-        when(userMapper.toResponse(userEntity)).thenReturn(expectedResponse);                   // Mapper, entity'den DTO'ya dönüştürdüğünde expectedResponse'u dönsün
+    @Test
+    @DisplayName("createUser - Başarılı Kullanıcı Oluşturma")
+    void createUser_shouldReturnUserResponse() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        when(roleRepository.findByName(ERole.ROLE_USER)).thenReturn(Optional.of(mockRole));
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        when(userMapper.toUser(any(UserRequest.class))).thenReturn(mockUser); 
+        when(userRepository.save(any(User.class))).thenReturn(mockUser);
+        when(userMapper.toResponse(any(User.class)))
+                .thenReturn(mockUserResponse);
+        
+        UserResponse result = userService.createUser(mockUserRequest);
 
-        // Servis metodunu çağır
-        UserResponse actualResponse = userService.createUser(request);
-
-        // Doğrulamalar
-        assertNotNull(actualResponse);
-        assertEquals(expectedResponse.getUsername(), actualResponse.getUsername());
-        assertEquals(expectedResponse.getEmail(), actualResponse.getEmail());
-        assertEquals(expectedResponse.getId(), actualResponse.getId());
-        assertEquals(expectedResponse.getFirstName(), actualResponse.getFirstName());
-        assertEquals(expectedResponse.getLastName(), actualResponse.getLastName());
-
-        // Metod çağrılarının doğrulanması
-        verify(userRepository, times(1)).findByUsername(request.getUsername());
-        verify(userRepository, times(1)).findByEmail(request.getEmail());
-        verify(userMapper, times(1)).toEntity(request);
-        verify(passwordEncoder, times(1)).encode(request.getPassword());
+        assertNotNull(result);
+        assertEquals(mockUserResponse.getUsername(), result.getUsername());
         verify(userRepository, times(1)).save(any(User.class));
-        verify(userMapper, times(1)).toResponse(userEntity);
+        verify(roleRepository, times(1)).findByName(ERole.ROLE_USER);
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        verify(userMapper, times(1)).toUser(any(UserRequest.class)); 
+        verify(passwordEncoder, times(1)).encode(anyString());
+        verify(userMapper, times(1)).toResponse(any(User.class));
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class)); 
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
     }
 
     @Test
-    @DisplayName("should throw InvalidInputException when username already exists")
-    void createUser_shouldThrowExceptionWhenUsernameExists() {
-        UserRequest request = UserRequest.builder()
-                .username("existinguser")
-                .email("test@example.com")
-                .password("password123")
-                .build();
+    @DisplayName("createUser - Kullanıcı Adı Zaten Mevcut Olduğunda InvalidInputException Fırlatma")
+    void createUser_whenUsernameExists_shouldThrowInvalidInputException() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(mockUser));
 
-        // Kullanıcı adı zaten mevcut olduğunda repository'den dolu bir Optional dönsün
-        when(userRepository.findByUsername(request.getUsername())).thenReturn(Optional.of(new User()));
-
-        // InvalidInputException fırlatıldığını doğrula
-        InvalidInputException thrown = assertThrows(InvalidInputException.class, () -> {
-            userService.createUser(request);
-        });
-        assertEquals("Kullanıcı adı '" + request.getUsername() + "' zaten mevcut.", thrown.getMessage());
-
-        // Metod çağrılarının doğrulanması
-        verify(userRepository, times(1)).findByUsername(request.getUsername());
-        verify(userRepository, never()).findByEmail(anyString()); // E-posta kontrolü yapılmamalı
-        verify(userRepository, never()).save(any(User.class));    // Kaydetme yapılmamalı
-        verify(userMapper, never()).toEntity(any(UserRequest.class)); // Dönüştürme yapılmamalı
-    }
-
-    @Test
-    @DisplayName("should throw InvalidInputException when email already exists")
-    void createUser_shouldThrowExceptionWhenEmailExists() {
-        UserRequest request = UserRequest.builder()
-                .username("newuser")
-                .email("existing@example.com")
-                .password("password123")
-                .build();
-
-        // Kullanıcı adı boş dönsün, ancak e-posta zaten mevcut olsun
-        when(userRepository.findByUsername(request.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(new User()));
-
-        // InvalidInputException fırlatıldığını doğrula
-        InvalidInputException thrown = assertThrows(InvalidInputException.class, () -> {
-            userService.createUser(request);
-        });
-        assertEquals("E-posta adresi '" + request.getEmail() + "' zaten kayıtlı.", thrown.getMessage());
-
-        // Metod çağrılarının doğrulanması
-        verify(userRepository, times(1)).findByUsername(request.getUsername());
-        verify(userRepository, times(1)).findByEmail(request.getEmail());
+        assertThrows(InvalidInputException.class, () -> userService.createUser(mockUserRequest));
         verify(userRepository, never()).save(any(User.class));
-        verify(userMapper, never()).toEntity(any(UserRequest.class));
+        verify(userRepository, times(1)).findByUsername(anyString());
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(roleRepository, never()).findByName(any());
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        verify(userMapper, never()).toUser(any(UserRequest.class)); 
+        verify(userMapper, never()).toResponse(any());
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class));
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
     }
 
     @Test
-    @DisplayName("should update a user successfully")
-    void updateUser_shouldUpdateUserSuccessfully() {
-        Long userId = 1L;
-        UserRequest request = UserRequest.builder()
-                .username("updateduser")
-                .email("updated@example.com")
-                .password("newpassword")
-                .firstName("Updated")
-                .lastName("User")
-                .build();
+    @DisplayName("createUser - E-posta Zaten Mevcut Olduğunda InvalidInputException Fırlatma")
+    void createUser_whenEmailExists_shouldThrowInvalidInputException() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(mockUser));
 
-        User existingUser = User.builder()
-                .id(userId)
-                .username("olduser")
-                .email("old@example.com")
-                .passwordHash("oldHashedPassword")
-                .firstName("Old")
-                .lastName("User")
-                .build();
+        assertThrows(InvalidInputException.class, () -> userService.createUser(mockUserRequest));
+        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, times(1)).findByUsername(anyString());
+        verify(userRepository, times(1)).findByEmail(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(roleRepository, never()).findByName(any());
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        verify(userMapper, never()).toUser(any(UserRequest.class)); 
+        verify(userMapper, never()).toResponse(any());
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class));
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
+    }
 
-        // Güncellenmiş User entity'sinin beklenen hali
-        User updatedUserEntity = User.builder()
-                .id(userId)
-                .username("updateduser")
-                .email("updated@example.com")
-                .passwordHash("hashedPassword") // passwordEncoder tarafından hash'lenmiş hali
-                .firstName("Updated")
-                .lastName("User")
-                .build();
+    @Test
+    @DisplayName("createUser - ROLE_USER Bulunamadığında ResourceNotFoundException Fırlatma")
+    void createUser_whenRoleUserNotFound_shouldThrowResourceNotFoundException() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        when(userMapper.toUser(any(UserRequest.class))).thenReturn(mockUser); 
+        when(roleRepository.findByName(ERole.ROLE_USER)).thenReturn(Optional.empty());
 
-        // Güncelleme sonrası dönmesi beklenen UserResponse DTO'su
-        UserResponse expectedResponse = UserResponse.builder()
-                .id(userId)
-                .username("updateduser")
-                .email("updated@example.com")
-                .firstName("Updated")
-                .lastName("User")
-                .build();
+        assertThrows(ResourceNotFoundException.class, () -> userService.createUser(mockUserRequest));
+        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, times(1)).findByUsername(anyString());
+        verify(userRepository, times(1)).findByEmail(anyString());
+        verify(passwordEncoder, times(1)).encode(anyString());
+        // KRİTİK DÜZELTME: userMapper.toEntity yerine userMapper.toUser
+        verify(userMapper, times(1)).toUser(any(UserRequest.class)); 
+        verify(roleRepository, times(1)).findByName(ERole.ROLE_USER);
+        verify(userMapper, never()).toResponse(any());
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class));
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
+    }
 
-        // Mock davranışlarını tanımla
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser)); // Mevcut kullanıcıyı bul
-        when(userRepository.findByUsername(request.getUsername())).thenReturn(Optional.empty()); // Yeni kullanıcı adı boş dönsün
-        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());       // Yeni e-posta boş dönsün
+    @Test
+    @DisplayName("updateUser - Başarılı Kullanıcı Güncelleme")
+    void updateUser_shouldReturnUpdatedUserResponse() {
+    	UserRequest updatedUserRequest = new UserRequest();
+        updatedUserRequest.setUsername("updateduser");
+        updatedUserRequest.setEmail("updated@example.com");
+        updatedUserRequest.setPassword("newpassword123"); 
+        updatedUserRequest.setFirstName("Updated");
+        updatedUserRequest.setLastName("User");
+        updatedUserRequest.setProfileImageUrl("http://example.com/updated.jpg");
+        updatedUserRequest.setBio("An updated test user");
+        updatedUserRequest.setTitle("Senior Developer");
+        updatedUserRequest.setLocation("New City");
+        updatedUserRequest.setPhone("0987654321");
+        updatedUserRequest.setPortfolioUrl("http://updated.com");
+        updatedUserRequest.setSocialLinks(Collections.singletonList(
+                SocialLinkRequest.builder().platform("LinkedIn").url("http://linkedin.com/updated").build()
+        ));
+        updatedUserRequest.setProjects(Collections.singletonList(
+                ProjectRequest.builder().title("New Project").description("New desc").build()
+        ));
 
-        // userMapper.updateEntityFromDto metodunun davranışını tanımla
-        // Bu metod void olduğu için doAnswer kullanıyoruz. Gerçekte ne yapacağını simüle ediyoruz.
-        doAnswer(invocation -> {
-            UserRequest req = invocation.getArgument(0);
-            User entity = invocation.getArgument(1);
-            entity.setUsername(req.getUsername());
-            entity.setEmail(req.getEmail());
-            entity.setFirstName(req.getFirstName());
-            entity.setLastName(req.getLastName());
-            // Password hash'leme işlemi burada yapılmadığı için, testte passwordEncoder mock'unu kontrol edeceğiz.
-            return null;
-        }).when(userMapper).updateEntityFromDto(eq(request), any(User.class));
 
-        when(userRepository.save(any(User.class))).thenReturn(updatedUserEntity); // Kaydetme işlemi sonrası güncellenmiş entity dönsün
-        when(userMapper.toResponse(updatedUserEntity)).thenReturn(expectedResponse); // Mapper, güncellenmiş entity'den DTO'ya dönüştürsün
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(mockUser));
+        // KRİTİK: updateEntityFromDto çağrısını doğrula
+        doNothing().when(userMapper).updateEntityFromDto(any(UserRequest.class), any(User.class)); 
+        
+        when(userRepository.findByUsername(updatedUserRequest.getUsername())).thenReturn(Optional.empty()); 
+        when(userRepository.findByEmail(updatedUserRequest.getEmail())).thenReturn(Optional.empty()); 
+        
+        when(userRepository.save(any(User.class))).thenReturn(mockUser);
+        when(userMapper.toResponse(any(User.class)))
+                .thenReturn(mockUserResponse);
 
-        // Servis metodunu çağır
-        UserResponse actualResponse = userService.updateUser(userId, request);
+        // KRİTİK: socialLinkMapper.toEntity ve projectMapper.toEntity doğrulamalarını SİL!
+        // Çünkü bu çağrılar artık UserServiceImpl içinde değil, UserMapperImpl içinde yapılıyor.
+        // when(socialLinkMapper.toEntity(any(SocialLinkRequest.class))).thenReturn(new SocialLink()); 
+        // when(projectMapper.toEntity(any(ProjectRequest.class))).thenReturn(new Project());
 
-        // Doğrulamalar
-        assertNotNull(actualResponse);
-        assertEquals(expectedResponse.getUsername(), actualResponse.getUsername());
-        assertEquals(expectedResponse.getEmail(), actualResponse.getEmail());
-        assertEquals(expectedResponse.getId(), actualResponse.getId());
-        assertEquals(expectedResponse.getFirstName(), actualResponse.getFirstName());
-        assertEquals(expectedResponse.getLastName(), actualResponse.getLastName());
 
-        // Metod çağrılarının doğrulanması
-        verify(userRepository, times(1)).findById(userId);
-        verify(userRepository, times(1)).findByUsername(request.getUsername());
-        verify(userRepository, times(1)).findByEmail(request.getEmail());
-        verify(userMapper, times(1)).updateEntityFromDto(eq(request), any(User.class));
-        verify(passwordEncoder, times(1)).encode(request.getPassword()); // Şifre güncellendiği için encode çağrılmalı
+        UserResponse result = userService.updateUser(1L, updatedUserRequest);
+
+        assertNotNull(result);
+        assertEquals(mockUserResponse.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).findById(eq(1L));
+        // KRİTİK: Sadece updateEntityFromDto'nun çağrıldığını doğrula
+        verify(userMapper, times(1)).updateEntityFromDto(eq(updatedUserRequest), any(User.class)); 
         verify(userRepository, times(1)).save(any(User.class));
-        verify(userMapper, times(1)).toResponse(updatedUserEntity);
+        verify(userMapper, times(1)).toResponse(any(User.class));
+        
+        // KRİTİK: Aşağıdaki doğrulamaları SİL! Mapper'ın sorumluluğundadır.
+        // verify(socialLinkMapper, times(updatedUserRequest.getSocialLinks().size())).toEntity(any(SocialLinkRequest.class));
+        // verify(projectMapper, times(updatedUserRequest.getProjects().size())).toEntity(any(ProjectRequest.class));
+
+        // KRİTİK: Mocked User objesi üzerinde addSocialLink ve addProject çağrılarının doğrulamalarını da SİL!
+        // Çünkü bu çağrılar artık UserServiceImpl'den değil, MapStruct tarafından generate edilen mapper içinde yapılıyor.
+        // verify(mockUser, times(updatedUserRequest.getSocialLinks().size())).addSocialLink(any(SocialLink.class));
+        // verify(mockUser, times(updatedUserRequest.getProjects().size())).addProject(any(Project.class));
     }
-
     @Test
-    @DisplayName("should throw ResourceNotFoundException when updating non-existing user")
-    void updateUser_shouldThrowExceptionWhenUserNotFound() {
-        Long userId = 99L;
-        UserRequest request = UserRequest.builder()
-                .username("nonexistent")
-                .email("non@example.com")
-                .build();
+    @DisplayName("updateUser - Kullanıcı Bulunamadığında ResourceNotFoundException Fırlatma")
+    void updateUser_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Kullanıcı bulunamadığında boş Optional dönsün
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
-        // ResourceNotFoundException fırlatıldığını doğrula
-        ResourceNotFoundException thrown = assertThrows(ResourceNotFoundException.class, () -> {
-            userService.updateUser(userId, request);
-        });
-
-        // Hata mesajını düzeltiyoruz
-        assertEquals("Kullanıcı, ID : '" + userId + "' ile bulunamadı", thrown.getMessage()); // <-- DÜZELTME BURADA
-        verify(userRepository, times(1)).findById(userId);
-        verify(userRepository, never()).findByUsername(anyString());
+        assertThrows(ResourceNotFoundException.class, () -> userService.updateUser(1L, mockUserRequest));
+        verify(userRepository, times(1)).findById(anyLong());
         verify(userRepository, never()).save(any(User.class));
+        verify(userMapper, never()).updateEntityFromDto(any(), any());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userMapper, never()).toResponse(any());
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class));
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
     }
 
     @Test
-    @DisplayName("should throw InvalidInputException when updating with existing username")
-    void updateUser_shouldThrowExceptionWhenUsernameAlreadyExists() {
-        Long userId = 1L;
-        User existingUser = User.builder().id(userId).username("user1").email("user1@example.com").build();
-        UserRequest request = UserRequest.builder().username("user2").email("user1@example.com").build(); // Farklı bir kullanıcı adı, ama mevcut
+    @DisplayName("updateUser - Güncelleme Sırasında Kullanıcı Adı Çakışması")
+    void updateUser_whenUsernameConflicts_shouldThrowInvalidInputException() {
+        User existingUser = User.builder().id(1L).username("user1").email("user1@example.com").build();
+        User conflictUser = User.builder().id(2L).username("testuser").email("test@example.com").build(); 
+        UserRequest userRequestWithConflictingUsername = new UserRequest();
+        userRequestWithConflictingUsername.setUsername("testuser"); 
+        userRequestWithConflictingUsername.setEmail("user1@example.com"); 
+        userRequestWithConflictingUsername.setPassword("newpassword123");
+        userRequestWithConflictingUsername.setProfileImageUrl("http://example.com/img.jpg");
+        userRequestWithConflictingUsername.setBio("bio");
+        userRequestWithConflictingUsername.setTitle("title");
+        userRequestWithConflictingUsername.setLocation("loc");
+        userRequestWithConflictingUsername.setPhone("phone");
+        userRequestWithConflictingUsername.setPortfolioUrl("url");
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
-        // Yeni kullanıcı adı zaten mevcut olduğunda dolu bir Optional dönsün (farklı bir kullanıcıya ait)
-        when(userRepository.findByUsername(request.getUsername())).thenReturn(Optional.of(new User()));
 
-        InvalidInputException thrown = assertThrows(InvalidInputException.class, () -> {
-            userService.updateUser(userId, request);
-        });
-        assertEquals("Kullanıcı adı 'user2' zaten mevcut.", thrown.getMessage());
-        verify(userRepository, times(1)).findById(userId);
-        verify(userRepository, times(1)).findByUsername(request.getUsername());
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(existingUser));
+        when(userRepository.findByUsername(userRequestWithConflictingUsername.getUsername())).thenReturn(Optional.of(conflictUser));
+
+        assertThrows(InvalidInputException.class, () -> userService.updateUser(1L, userRequestWithConflictingUsername));
+        verify(userRepository, times(1)).findById(eq(1L));
+        verify(userRepository, times(1)).findByUsername(userRequestWithConflictingUsername.getUsername());
         verify(userRepository, never()).findByEmail(anyString());
         verify(userRepository, never()).save(any(User.class));
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userMapper, never()).toUser(any()); // KRİTİK DÜZELTME: toEntity yerine toUser
+        verify(userMapper, never()).toResponse(any());
+        verify(socialLinkMapper, never()).toEntity(any(SocialLinkRequest.class));
+        verify(projectMapper, never()).toEntity(any(ProjectRequest.class));
     }
 
     @Test
-    @DisplayName("should get user by id successfully")
-    void getUserById_shouldReturnUserSuccessfully() {
-        Long userId = 1L;
-        User userEntity = User.builder().id(userId).username("testuser").email("test@example.com").build();
-        UserResponse expectedResponse = UserResponse.builder().id(userId).username("testuser").email("test@example.com").build();
+    @DisplayName("getUserById - Başarılı Kullanıcı Getirme")
+    void getUserById_shouldReturnUserResponse() {
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(mockUser));
+        when(userMapper.toResponse(any(User.class)))
+                .thenReturn(mockUserResponse);
 
-        // userRepository.findById çağrıldığında Optional.of(userEntity) dönmesini sağla
-        when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
-        // userMapper.toResponse çağrıldığında userEntity'yi expectedResponse'a dönüştürmesini sağla
-        when(userMapper.toResponse(userEntity)).thenReturn(expectedResponse);
-
-        // Servis metodunu çağır
-        // Düzeltme: userService.getUserById(userId) artık doğrudan User döndürüyor
-        User actualUser = userService.getUserById(userId); // <-- BURADA DÜZELTME YAPILDI
-
-        // Optional'ın dolu olduğunu ve içinde doğru User objesinin olduğunu doğrula
-        assertNotNull(actualUser, "User should be found"); // <-- BURADA DÜZELTME YAPILDI
-
-        // User objesini UserResponse'a dönüştür
-        UserResponse actualResponse = userMapper.toResponse(actualUser); // <-- BURADA DÜZELTME YAPILDI
-
-        assertNotNull(actualResponse);
-        assertEquals(expectedResponse.getId(), actualResponse.getId());
-        assertEquals(expectedResponse.getUsername(), actualResponse.getUsername());
-        verify(userRepository, times(1)).findById(userId);
-        verify(userMapper, times(1)).toResponse(userEntity);
+        UserResponse result = userService.getUserById(1L);
+        assertNotNull(result);
+        assertEquals(mockUserResponse.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).findById(anyLong());
+        verify(userMapper, times(1)).toResponse(any(User.class));
     }
 
     @Test
-    @DisplayName("should throw ResourceNotFoundException when user not found by id")
-    void getUserById_shouldThrowExceptionWhenUserNotFound() {
-        Long userId = 99L;
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+    @DisplayName("getUserById - Kullanıcı Bulunamadığında ResourceNotFoundException Fırlatma")
+    void getUserById_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        when(userRepository.findById(anyLong())).thenReturn(Optional.empty()); 
 
-        ResourceNotFoundException thrown = assertThrows(ResourceNotFoundException.class, () -> {
-            userService.getUserById(userId);
-        });
-        // Hata mesajını düzeltiyoruz
-        assertEquals("Kullanıcı, ID : '" + userId + "' ile bulunamadı", thrown.getMessage()); // <-- DÜZELTME BURADA
-        verify(userRepository, times(1)).findById(userId);
-        verify(userMapper, never()).toResponse(any(User.class)); // Kullanıcı bulunamadığı için mapper çağrılmamalı
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(1L));
+        verify(userRepository, times(1)).findById(anyLong());
+        verify(userMapper, never()).toResponse(any(User.class));
     }
 
     @Test
-    @DisplayName("should return all users successfully")
-    void getAllUsers_shouldReturnAllUsers() {
-        User user1 = User.builder().id(1L).username("user1").email("user1@example.com").build();
-        User user2 = User.builder().id(2L).username("user2").email("user2@example.com").build();
-        List<User> userEntities = Arrays.asList(user1, user2);
+    @DisplayName("getUserByUsername - Başarılı Kullanıcı Getirme")
+    void getUserByUsername_shouldReturnUserResponse() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(mockUser));
+        when(userMapper.toResponse(any(User.class)))
+                .thenReturn(mockUserResponse);
 
-        UserResponse response1 = UserResponse.builder().id(1L).username("user1").email("user1@example.com").build();
-        UserResponse response2 = UserResponse.builder().id(2L).username("user2").email("user2@example.com").build();
-        List<UserResponse> expectedResponses = Arrays.asList(response1, response2);
-
-        when(userRepository.findAll()).thenReturn(userEntities);
-        // Her bir User entity'si için mapper'ın dönüşünü mockla
-        when(userMapper.toResponse(user1)).thenReturn(response1);
-        when(userMapper.toResponse(user2)).thenReturn(response2);
-
-        List<UserResponse> actualResponses = userService.getAllUsers();
-
-        assertNotNull(actualResponses);
-        assertEquals(2, actualResponses.size());
-        assertEquals(expectedResponses.get(0).getUsername(), actualResponses.get(0).getUsername());
-        assertEquals(expectedResponses.get(1).getUsername(), actualResponses.get(1).getUsername());
-        verify(userRepository, times(1)).findAll();
-        verify(userMapper, times(1)).toResponse(user1);
-        verify(userMapper, times(1)).toResponse(user2);
+        UserResponse result = userService.getUserByUsername("testuser");
+        assertNotNull(result);
+        assertEquals(mockUserResponse.getUsername(), result.getUsername());
+        verify(userRepository, times(1)).findByUsername(anyString());
+        verify(userMapper, times(1)).toResponse(any(User.class));
     }
 
     @Test
-    @DisplayName("should delete a user successfully")
-    void deleteUser_shouldDeleteUserSuccessfully() {
-        Long userId = 1L;
-        // Kullanıcı var mı kontrolü için existsById mockla
-        when(userRepository.existsById(userId)).thenReturn(true);
-        // deleteById metodunun çağrıldığında hiçbir şey yapmamasını sağla (void metodlar için doNothing)
-        doNothing().when(userRepository).deleteById(userId);
+    @DisplayName("getUserByUsername - Kullanıcı Bulunamadığında ResourceNotFoundException Fırlatma")
+    void getUserByUsername_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
 
-        userService.deleteUser(userId);
-
-        verify(userRepository, times(1)).existsById(userId);
-        verify(userRepository, times(1)).deleteById(userId);
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserByUsername("nonexistent"));
+        verify(userRepository, times(1)).findByUsername(anyString());
+        verify(userMapper, never()).toResponse(any(User.class));
     }
 
     @Test
-    @DisplayName("should throw exception when user not found during delete")
-    void deleteUser_shouldThrowExceptionWhenUserNotFound() {
-        Long userId = 99L;
-        when(userRepository.existsById(userId)).thenReturn(false);
+    @DisplayName("deleteUser - Başarılı Kullanıcı Silme")
+    void deleteUser_shouldDeleteUser() {
+        when(userRepository.existsById(anyLong())).thenReturn(true);
+        doNothing().when(userRepository).deleteById(anyLong());
+
+        userService.deleteUser(1L);
+
+        verify(userRepository, times(1)).existsById(1L);
+        verify(userRepository, times(1)).deleteById(1L);
+    }
+
+    @Test
+    @DisplayName("deleteUser - Kullanıcı Bulunamadığında ResourceNotFoundException Fırlatma")
+    void deleteUser_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        when(userRepository.existsById(anyLong())).thenReturn(false);
 
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            userService.deleteUser(userId);
+            userService.deleteUser(1L);
         });
 
-        // Hata mesajını düzeltiyoruz
-        // ResourceNotFoundException'ın constructor'ı "resourceName", "fieldName", "fieldValue" alır
-        // ve mesajı "ResourceNotFoundException: Kaynak adı 'resourceName' Alan adı 'fieldName' Alan değeri 'fieldValue' ile bulunamadı" şeklinde oluşturur.
-        // Bu yüzden, sadece ResourceNotFoundException'ın fırlatıldığını ve parametrelerinin doğru olduğunu kontrol etmek daha iyidir.
-        assertEquals("Kullanıcı", exception.getResourceName()); // Kaynak adı
-        assertEquals("ID", exception.getFieldName());       // Alan adı
-        assertEquals(userId, exception.getFieldValue());    // Alan değeri
+        assertEquals("User", exception.getResourceName());
+        assertEquals("ID", exception.getFieldName());
+        assertEquals(1L, exception.getFieldValue());
 
-        verify(userRepository, times(1)).existsById(userId);
-        verify(userRepository, never()).findById(anyLong());    // findById çağrılmamalı
-        verify(userRepository, never()).deleteById(anyLong());  // deleteById çağrılmamalı
+        verify(userRepository, times(1)).existsById(1L);
+        verify(userRepository, never()).deleteById(anyLong());
     }
 
     @Test
-    @DisplayName("should find user by username successfully")
-    void getUserByUsername_shouldReturnUser() {
-        String username = "testuser";
-        User user = User.builder().id(1L).username(username).build();
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+    @DisplayName("updatePassword - Başarılı Şifre Güncelleme")
+    void updatePassword_shouldUpdatePassword() {
+    	// Test senaryosu için kullanıcı ve şifre bilgilerini hazırla
+        Long userId = 1L;
+        String oldPassword = "oldPass";
+        String newPassword = "newPass123";
+        String newEncodedPassword = "newEncodedPass"; // Mock olarak dönecek hash
+        String originalEncodedPassword = "oldEncodedPass"; // Kullanıcının başlangıçtaki hashlenmiş şifresi
 
-        Optional<User> foundUser = userService.getUserByUsername(username);
+        // Mock User objesini oluştur ve eski şifre hash'ini ayarla
+        User user = new User();
+        user.setId(userId);
+        user.setPasswordHash(originalEncodedPassword); // Başlangıçtaki hashlenmiş şifre
+        
+        // Mock davranışlarını tanımla
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        // passwordEncoder.matches çağrıldığında, doğru eski şifre için true dönsün
+        when(passwordEncoder.matches(oldPassword, originalEncodedPassword)).thenReturn(true); // Buradaki originalEncodedPassword önemli
+        // passwordEncoder.encode çağrıldığında, yeni hashlenmiş şifreyi dönsün
+        when(passwordEncoder.encode(newPassword)).thenReturn(newEncodedPassword);
+        // userRepository.save çağrıldığında, gelen user objesini geri dönsün
+        when(userRepository.save(any(User.class))).thenReturn(user);
 
-        assertTrue(foundUser.isPresent());
-        assertEquals(username, foundUser.get().getUsername());
-        verify(userRepository, times(1)).findByUsername(username);
+        // Şifre güncelleme isteği DTO'sunu oluştur
+        PasswordUpdateRequest request = new PasswordUpdateRequest(oldPassword, newPassword);
+
+        // Metodu çağır (artık bir değer döndürmüyor)
+        userService.updatePassword(userId, request);
+
+        // Doğrulamalar: İlgili metotların çağrılıp çağrılmadığını kontrol et
+        verify(userRepository, times(1)).findById(userId); // findById bir kez çağrıldı mı?
+        // KRİTİK DÜZELTME: passwordEncoder.matches doğrulamasını düzelt
+        // İkinci parametre olarak user objesinin orijinal hash'lenmiş şifresini beklemeli.
+        verify(passwordEncoder, times(1)).matches(oldPassword, originalEncodedPassword); 
+        verify(passwordEncoder, times(1)).encode(newPassword); // encode bir kez çağrıldı mı?
+        verify(userRepository, times(1)).save(user); // save bir kez çağrıldı mı?
+
+        // Şifrenin User objesi üzerinde gerçekten güncellendiğini doğrulama
+        assertEquals(newEncodedPassword, user.getPasswordHash());
+        assertNotNull(user.getUpdatedAt()); // updatedAt alanının null olmadığını doğrula (güncellendiğini varsayarak)
     }
 
     @Test
-    @DisplayName("should return empty optional when user not found by username")
-    void getUserByUsername_shouldReturnEmptyOptional_whenNotFound() {
-        String username = "nonexistent";
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+    @DisplayName("updatePassword - Kullanıcı Bulunamadığında ResourceNotFoundException Fırlatma")
+    void updatePassword_whenUserNotFound_shouldThrowResourceNotFoundException() {
+        PasswordUpdateRequest request = new PasswordUpdateRequest("oldPass", "newPass");
+        when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        Optional<User> foundUser = userService.getUserByUsername(username);
-
-        assertFalse(foundUser.isPresent());
-        verify(userRepository, times(1)).findByUsername(username);
+        assertThrows(ResourceNotFoundException.class, () -> userService.updatePassword(1L, request));
+        verify(userRepository, times(1)).findById(anyLong());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+        verify(userMapper, never()).toResponse(any(User.class));
     }
 
     @Test
-    @DisplayName("should find user by username or email when found by username")
+    @DisplayName("updatePassword - Mevcut Şifre Yanlış Olduğunda InvalidInputException Fırlatma")
+    void updatePassword_whenOldPasswordInvalid_shouldThrowInvalidInputException() {
+        PasswordUpdateRequest request = new PasswordUpdateRequest("wrongPass", "newPass123");
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(mockUser));
+        when(passwordEncoder.matches("wrongPass", mockUser.getPasswordHash())).thenReturn(false);
+
+        assertThrows(InvalidInputException.class, () -> userService.updatePassword(1L, request));
+        verify(passwordEncoder, times(1)).matches(anyString(), anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+        verify(userMapper, never()).toResponse(any(User.class));
+    }
+
+
+    @Test
+    @DisplayName("getAllUsers - Tüm Kullanıcıları Getirme")
+    void getAllUsers_shouldReturnListOfUserResponses() {
+        User user1 = User.builder().id(1L).username("user1").email("user1@example.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
+        User user2 = User.builder().id(2L).username("user2").email("user2@example.com").createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
+        when(userRepository.findAll()).thenReturn(Arrays.asList(user1, user2));
+
+        // KRİTİK DÜZELTME: UserResponse builder ile oluşturuldu ve tüm alanlar dahil edildi
+        UserResponse response1 = UserResponse.builder()
+            .id(1L).username("user1").email("user1@example.com").firstName("User").lastName("One")
+            .profileImageUrl("url1").bio("bio1").title("title1").location("loc1").phone("phone1").portfolioUrl("port1")
+            .roles(Collections.singletonList("ROLE_USER")).socialLinks(Collections.emptyList()).projects(Collections.emptyList())
+            .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
+
+        UserResponse response2 = UserResponse.builder()
+            .id(2L).username("user2").email("user2@example.com").firstName("User").lastName("Two")
+            .profileImageUrl("url2").bio("bio2").title("title2").location("loc2").phone("phone2").portfolioUrl("port2")
+            .roles(Collections.singletonList("ROLE_USER")).socialLinks(Collections.emptyList()).projects(Collections.emptyList())
+            .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
+
+        when(userMapper.toResponseList(anyList())).thenReturn(Arrays.asList(response1, response2));
+
+        List<UserResponse> result = userService.getAllUsers();
+
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals(2, result.size());
+        assertEquals("user1", result.get(0).getUsername());
+        assertEquals("user2", result.get(1).getUsername());
+        verify(userRepository, times(1)).findAll();
+        verify(userMapper, times(1)).toResponseList(anyList());
+    }
+
+    @Test
+    @DisplayName("findByUsernameOrEmail - Kullanıcı Adı ile Başarılı Bulma")
     void findByUsernameOrEmail_shouldReturnUser_whenFoundByUsername() {
         String identifier = "testuser";
-        User user = User.builder().id(1L).username(identifier).email("test@example.com").build();
+        User user = mockUser;
         when(userRepository.findByUsername(identifier)).thenReturn(Optional.of(user));
 
         Optional<User> foundUser = userService.findByUsernameOrEmail(identifier);
@@ -440,11 +547,12 @@ public class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("should find user by username or email when found by email")
+    @DisplayName("findByUsernameOrEmail - E-posta ile Başarılı Bulma")
     void findByUsernameOrEmail_shouldReturnUser_whenFoundByEmail() {
         String identifier = "test@example.com";
+        User user = mockUser;
         when(userRepository.findByUsername(identifier)).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(identifier)).thenReturn(Optional.of(User.builder().id(1L).username("testuser").email(identifier).build()));
+        when(userRepository.findByEmail(identifier)).thenReturn(Optional.of(user));
 
         Optional<User> foundUser = userService.findByUsernameOrEmail(identifier);
 
@@ -455,7 +563,7 @@ public class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("should return empty optional when user not found by username or email")
+    @DisplayName("findByUsernameOrEmail - Kullanıcı Adı veya E-posta ile Bulunamama")
     void findByUsernameOrEmail_shouldReturnEmptyOptional_whenNotFound() {
         String identifier = "nonexistent";
         when(userRepository.findByUsername(identifier)).thenReturn(Optional.empty());

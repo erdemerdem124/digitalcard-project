@@ -60,18 +60,20 @@
           <i class="fas fa-briefcase"></i>
           <p><strong>Unvan:</strong> {{ userProfile.title }}</p>
         </div>
-        <!-- Şirket alanı kaldırıldı -->
-        <div *ngIf="userProfile.phoneNumber" class="detail-item">
+        <!-- KRİTİK DÜZELTME: phoneNumber yerine phone -->
+        <div *ngIf="userProfile.phone" class="detail-item">
           <i class="fas fa-phone"></i>
-          <p><strong>Telefon:</strong> <a [href]="'tel:' + userProfile.phoneNumber">{{ userProfile.phoneNumber }}</a></p>
+          <p><strong>Telefon:</strong> <a [href]="'tel:' + userProfile.phone">{{ userProfile.phone }}</a></p>
         </div>
-        <div *ngIf="userProfile.website" class="detail-item">
+        <!-- KRİTİK DÜZELTME: website yerine portfolioUrl -->
+        <div *ngIf="userProfile.portfolioUrl" class="detail-item">
           <i class="fas fa-globe"></i>
-          <p><strong>Web Sitesi:</strong> <a [href]="userProfile.website" target="_blank">{{ userProfile.website }}</a></p>
+          <p><strong>Web Sitesi:</strong> <a [href]="userProfile.portfolioUrl" target="_blank">{{ userProfile.portfolioUrl }}</a></p>
         </div>
-        <div *ngIf="userProfile.address" class="detail-item">
+        <!-- KRİTİK DÜZELTME: address yerine location -->
+        <div *ngIf="userProfile.location" class="detail-item">
           <i class="fas fa-map-marker-alt"></i>
-          <p><strong>Konum:</strong> {{ userProfile.address }}</p>
+          <p><strong>Konum:</strong> {{ userProfile.location }}</p>
         </div>
       </div>
 
@@ -93,14 +95,18 @@
         <h2><i class="fas fa-project-diagram"></i> Projelerim</h2>
         <div class="projects-grid">
           <div *ngFor="let project of userProfile.projects" class="project-item">
-            <h3>{{ project.name }}</h3>
+            <div *ngIf="project.projectImageUrl" class="project-image-display-container">
+                <img [src]="project.projectImageUrl" alt="Proje Görseli" class="project-display-image">
+            </div>
+            <h3>{{ project.title }}</h3> <!-- KRİTİK DÜZELTME: project.name yerine project.title -->
             <p>{{ project.description }}</p>
             <div class="project-tech">
-              <span *ngFor="let tech of project.technologies">
-                <i class="fas fa-code"></i> {{ tech }}
+              <!-- KRİTİK DÜZELTME: technologies artık string olduğu için direkt göster, dizi olarak döngüye alma -->
+              <span *ngIf="project.technologies">
+                <i class="fas fa-code"></i> {{ project.technologies }}
               </span>
             </div>
-            <a *ngIf="project.url" [href]="project.url" target="_blank" class="project-url">
+            <a *ngIf="project.projectUrl" [href]="project.projectUrl" target="_blank" class="project-url"> <!-- KRİTİK DÜZELTME: project.url yerine project.projectUrl -->
               <i class="fas fa-external-link-alt"></i> Projeyi Görüntüle
             </a>
           </div>
@@ -117,7 +123,6 @@
           </button>
         </div>
       </div>
-      <!-- "Hesabı Sil" bölümü Home sayfasından tamamen kaldırıldı -->
     </div>
   </main>
 </div>

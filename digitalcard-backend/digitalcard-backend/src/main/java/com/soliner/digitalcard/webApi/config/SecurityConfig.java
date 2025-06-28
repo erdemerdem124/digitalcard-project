@@ -24,6 +24,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List; // java.util.List importunu ekle
 
 /**
  * Spring Security yapılandırma sınıfı.
@@ -32,13 +33,16 @@ import java.util.Arrays;
  */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity // prePostEnabled = true varsayılan olarak gelir
 public class SecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    // Lombok'un @RequiredArgsConstructor anotasyonunu kullanıyorsanız, bu constructor'a gerek yoktur.
+    // Ancak elle yönetmek isterseniz, böyle kalabilir. Ben @RequiredArgsConstructor ile uyumlu hale getirdim
+    // ve constructor injection'ı Lombok'a bıraktım.
     public SecurityConfig(UserDetailsServiceImpl userDetailsService, AuthEntryPointJwt unauthorizedHandler, JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;
@@ -61,11 +65,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
+        // Frontend'in URL'si: Hem 4200 hem de 8080 (backend'in kendi URL'si) eklenmeli
+        configuration.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:8080")); 
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("*")); // Tüm başlıklara izin ver
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+        configuration.setMaxAge(3600L); // Pre-flight (OPTIONS) istekleri için önbellek süresi
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -80,44 +85,54 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(AbstractHttpConfigurer::disable) // CSRF korumasını devre dışı bırak (stateless API'ler için yaygın)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS yapılandırmasını etkinleştir
+            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler)) // Yetkilendirme hataları için özel giriş noktası
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Oturum kullanma
             .authorizeHttpRequests(authorize -> authorize
-                // Herkese açık endpoint'ler (kimlik doğrulama gerektirmez)
-                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
+                // Herkese açık endpoint'ler (kimlik doğrulama gerektirmez) - en spesifikten başla
+                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll() // Login ve Register
+                .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // Yeni kullanıcı oluşturma (kayıt)
 
-                // Kullanıcı profili çekme endpoint'i için özel kural: Kimlik doğrulaması gerektirir
-                .requestMatchers(HttpMethod.GET, "/api/users/username/**").authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/users/{userId}").authenticated() // Kullanıcı profili güncelleme
-                .requestMatchers(HttpMethod.DELETE, "/api/users/{userId}").authenticated() // Kullanıcı hesabı silme
+                // Public API'ler (eğer varsa, mesela QR kodu profili çekmek için)
+                // Dikkat: Eğer "/api/users/username/**" public olacaksa bu en üste alınmalı.
+                // Testlerdeki "getUserByUsername" bu kuralı kullanabilir.
+                .requestMatchers("/api/public/**").permitAll() 
+                // Eğer profil URL'si public ise:
+                // .requestMatchers(HttpMethod.GET, "/api/users/username/**").permitAll() // Eğer kullanıcı profilleri public ise
 
-                // YENİ EKLENEN KURAL: Sosyal linkler için endpoint'lere kimlik doğrulaması yapılmış kullanıcıların erişimine izin ver
-                .requestMatchers(HttpMethod.GET, "/api/sociallinks/user/**").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/sociallinks").authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/sociallinks/**").authenticated()
-                .requestMatchers(HttpMethod.DELETE, "/api/sociallinks/**").authenticated()
 
-                // YENİ EKLENEN KURAL: Projeler için endpoint'lere kimlik doğrulaması yapılmış kullanıcıların erişimine izin ver
-                .requestMatchers(HttpMethod.GET, "/api/projects/user/**").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/projects").authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/projects/**").authenticated()
-                .requestMatchers(HttpMethod.DELETE, "/api/projects/**").authenticated()
+                // Sadece kimliği doğrulanmış kullanıcılar için endpoint'ler (authenticated)
+                // UserController'daki GET, PUT, DELETE metotları
+                .requestMatchers(HttpMethod.GET, "/api/users/{id}").authenticated() // Kullanıcıyı ID ile getirme
+                .requestMatchers(HttpMethod.PUT, "/api/users/{id}").authenticated() // Kullanıcıyı güncelleme
+                .requestMatchers(HttpMethod.DELETE, "/api/users/{id}").authenticated() // Kullanıcıyı silme
+                // Kullanıcı adına göre profil çekme (Eğer özel değilse)
+                .requestMatchers(HttpMethod.GET, "/api/users/username/**").authenticated() // Kullanıcıyı username ile getirme
 
-                // Şifre güncelleme endpoint'i için özel kural: Kimlik doğrulaması gerektirir
-                .requestMatchers(HttpMethod.PUT, "/api/auth/users/{userId}/password").authenticated()
-                // Diğer tüm /api/auth/** endpoint'leri için kimlik doğrulama gerektir
-                .requestMatchers("/api/auth/**").authenticated()
-                // Admin endpoint'leri için ADMIN rolü gerektirir
+                // Şifre güncelleme endpoint'i: "/api/users/{id}/password"
+                // Testleriniz bu URL'i kullandığı için doğru path'i buraya ekledim.
+                .requestMatchers(HttpMethod.PUT, "/api/users/{id}/password").authenticated() 
+
+                // Sosyal linkler endpoint'leri
+                .requestMatchers("/api/sociallinks/**").authenticated()
+
+                // Projeler endpoint'leri
+                .requestMatchers("/api/projects/**").authenticated()
+
+                // Admin endpoint'leri (ADMIN rolü gerektirir)
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                // Yukarıdaki kuralların hiçbirine uymayan tüm diğer istekler için kimlik doğrulama gerektirir
+
+                // Diğer tüm /api/auth/** endpoint'leri için kimlik doğrulama gerektir
+                // Login ve register dışındaki auth endpoint'leri (örn: refresh token, logout)
+                .requestMatchers("/api/auth/**").authenticated()
+
+                // Kural dışı kalan diğer tüm istekler için kimlik doğrulama gerektir
                 .anyRequest().authenticated()
             );
 
-        http.authenticationProvider(authenticationProvider());
-        // JwtAuthenticationFilter'ı UsernamePasswordAuthenticationFilter'dan önce ekle
+        http.authenticationProvider(authenticationProvider()); // Özel kimlik doğrulama sağlayıcısını ekle
+        // JWT filtresini UsernamePasswordAuthenticationFilter'dan önce ekle
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -1,111 +1,116 @@
 package com.soliner.digitalcard.webApi.controller;
 
-import com.soliner.digitalcard.application.services.interfaces.ProjectService; // ProjectService arayüzünü import ediyoruz
-import com.soliner.digitalcard.webApi.dto.project.ProjectRequest; // ProjectRequest DTO'yu import ediyoruz
-import com.soliner.digitalcard.webApi.dto.project.ProjectResponse; // ProjectResponse DTO'yu import ediyoruz
+import com.soliner.digitalcard.application.services.interfaces.ProjectService;
+import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
+import com.soliner.digitalcard.webApi.dto.project.ProjectRequest;
+import com.soliner.digitalcard.webApi.dto.project.ProjectResponse;
+// KRİTİK DÜZELTME: UserDetailsImpl import yolu güncellendi
+import com.soliner.digitalcard.application.services.impl.UserDetailsImpl; 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid; // İstek gövdesi validasyonu için
-import org.springframework.http.HttpStatus; // HTTP durum kodları için
-import org.springframework.http.ResponseEntity; // API yanıtları için
-import org.springframework.web.bind.annotation.*; // RESTful anotasyonlar için
-
+import jakarta.validation.Valid;
 import java.util.List;
-// Kaldırılan import'lar (Controller katmanında doğrudan kullanılmadıkları için):
-// import com.soliner.digitalcard.application.services.interfaces.UserService;
-// import com.soliner.digitalcard.application.mapper.ProjectMapper;
-// import com.soliner.digitalcard.domain.model.Project;
-// import com.soliner.digitalcard.domain.model.User;
-// import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException;
-// import java.util.Optional;
-// import java.util.stream.Collectors;
-
 
 /**
  * Projelerle ilgili RESTful API endpoint'lerini yöneten Controller sınıfı.
  * Gelen HTTP isteklerini işler, servis katmanını çağırır ve DTO'lar aracılığıyla yanıt döner.
  * webApi katmanına aittir.
  */
-@RestController // Bu sınıfın bir REST Controller olduğunu belirtir
-@RequestMapping("/api/projects") // Tüm endpoint'ler için temel URL yolu (örn: /api/projects)
+@RestController
+@RequestMapping("/api/users/{userId}/projects")
+@Slf4j
 public class ProjectController {
 
-    private final ProjectService projectService; // Proje iş mantığı için servis katmanı
+    private final ProjectService projectService;
 
-    // Constructor Injection ile bağımlılıkları enjekte ediyoruz. Sadece ProjectService'e bağımlı.
     public ProjectController(ProjectService projectService) {
         this.projectService = projectService;
     }
 
-    /**
-     * Belirli bir kullanıcıya ait tüm projeleri listeler.
-     * HTTP Metodu: GET
-     * Endpoint: /api/projects/user/{userId}
-     * @param userId Projelerin ait olduğu kullanıcının ID'si.
-     * @return Projelerin listesini içeren ProjectResponse nesneleri ve 200 OK durumu.
-     */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<ProjectResponse>> getProjectsByUserId(@PathVariable Long userId) {
-        // Servis katmanı zaten DTO listesi döndürüyor, Controller'da dönüşüme gerek yok.
-        List<ProjectResponse> projectResponses = projectService.getProjectsByUserId(userId);
-        return ResponseEntity.ok(projectResponses);
+    @PostMapping
+    public ResponseEntity<ProjectResponse> createProject(
+            @PathVariable Long userId,
+            @Valid @RequestBody ProjectRequest projectRequest) {
+        log.info("Kullanıcı ID: {} için proje oluşturma isteği alındı.", userId);
+        validateUserOwnership(userId); 
+        ProjectResponse newProject = projectService.createProject(userId, projectRequest);
+        log.info("Kullanıcı ID: {} için proje başarıyla oluşturuldu: {}", userId, newProject.getTitle());
+        return new ResponseEntity<>(newProject, HttpStatus.CREATED);
     }
 
-    /**
-     * Belirli bir ID'ye sahip projeyi getirir.
-     * HTTP Metodu: GET
-     * Endpoint: /api/projects/{id}
-     * @param id Projenin benzersiz ID'si (URL yolundan alınır).
-     * @return Bulunan projeye ait ProjectResponse nesnesi ve 200 OK durumu.
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<ProjectResponse> getProjectById(@PathVariable Long id) {
-        // Servis katmanı zaten DTO döndürüyor ve ResourceNotFoundException fırlatıyor.
-        // GlobalExceptionHandler bu istisnayı 404'e çevirecek.
-        ProjectResponse project = projectService.getProjectById(id);
+    @GetMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> getProjectById(@PathVariable Long projectId) {
+        log.info("Proje ID: {} için getirme isteği alındı.", projectId);
+        ProjectResponse project = projectService.getProjectById(projectId);
+        log.info("Proje ID: {} başarıyla getirildi: {}", projectId, project.getTitle());
         return ResponseEntity.ok(project);
     }
 
-    /**
-     * Yeni bir proje oluşturur.
-     * HTTP Metodu: POST
-     * Endpoint: /api/projects
-     * @param projectRequest Oluşturulacak projenin bilgilerini içeren ProjectRequest DTO'su (istek gövdesinden alınır).
-     * @return Oluşturulan projeye ait ProjectResponse nesnesi ve 201 Created durumu.
-     */
-    @PostMapping
-    public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody ProjectRequest projectRequest) {
-        // Controller sadece DTO'yu servise iletir. Kullanıcı kontrolü ve DTO-Entity dönüşümü servisin sorumluluğundadır.
-        ProjectResponse createdProject = projectService.createProject(projectRequest);
-        return new ResponseEntity<>(createdProject, HttpStatus.CREATED);
+    @GetMapping
+    public ResponseEntity<List<ProjectResponse>> getAllProjectsByUserId(@PathVariable Long userId) {
+        log.info("Kullanıcı ID: {} için tüm projeleri getirme isteği alındı.", userId);
+        validateUserOwnership(userId);
+        List<ProjectResponse> projects = projectService.getAllProjectsByUserId(userId);
+        log.info("Kullanıcı ID: {} için {} proje bulundu.", userId, projects.size());
+        return ResponseEntity.ok(projects);
     }
 
-    /**
-     * Mevcut bir projeyi günceller.
-     * HTTP Metodu: PUT
-     * Endpoint: /api/projects/{id}
-     * @param id Güncellenecek projenin benzersiz ID'si.
-     * @param projectRequest Güncelleme bilgilerini içeren ProjectRequest DTO'su.
-     * @return Güncellenen projeye ait ProjectResponse nesnesi ve 200 OK durumu.
-     */
-    @PutMapping("/{id}")
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id, @Valid @RequestBody ProjectRequest projectRequest) {
-        // Controller sadece DTO'yu servise iletir. Güncelleme mantığı ve DTO-Entity dönüşümü servisin sorumluluğundadır.
-        ProjectResponse updatedProject = projectService.updateProject(id, projectRequest);
+    @PutMapping("/{projectId}")
+    public ResponseEntity<ProjectResponse> updateProject(
+            @PathVariable Long userId,
+            @PathVariable Long projectId,
+            @Valid @RequestBody ProjectRequest projectRequest) {
+        log.info("Kullanıcı ID: {} ve Proje ID: {} için güncelleme isteği alındı.", userId, projectId);
+        validateUserOwnership(userId);
+        ProjectResponse updatedProject = projectService.updateProject(userId, projectId, projectRequest);
+        log.info("Kullanıcı ID: {} ve Proje ID: {} başarıyla güncellendi: {}", userId, projectId, updatedProject.getTitle());
         return ResponseEntity.ok(updatedProject);
     }
 
-    /**
-     * Belirli bir ID'ye sahip projeyi siler.
-     * HTTP Metodu: DELETE
-     * Endpoint: /api/projects/{id}
-     * @param id Silinecek projenin benzersiz ID'si.
-     * @return 204 No Content durumu.
-     */
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT) // 204 No Content döner
-    public void deleteProject(@PathVariable Long id) {
-        // Servis katmanı varlık kontrolünü ve silmeyi yapar. ResourceNotFoundException fırlatırsa
-        // GlobalExceptionHandler 404'e çevirir.
-        projectService.deleteProject(id);
+    @DeleteMapping("/{projectId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteProject(
+            @PathVariable Long userId,
+            @PathVariable Long projectId) {
+        log.info("Kullanıcı ID: {} ve Proje ID: {} için silme isteği alındı.", userId, projectId);
+        validateUserOwnership(userId);
+        projectService.deleteProject(userId, projectId);
+        log.info("Kullanıcı ID: {} ve Proje ID: {} başarıyla silindi.", userId, projectId);
+    }
+
+    private void validateUserOwnership(Long pathUserId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            log.warn("Kimlik doğrulaması yapılmamış veya anonim kullanıcıdan yetkisiz erişim denemesi.");
+            throw new AccessDeniedException("Kimlik doğrulaması yapılmamış kullanıcı.");
+        }
+
+        Object principal = authentication.getPrincipal();
+        Long authenticatedUserId;
+
+        // KRİTİK DÜZELTME: UserDetailsImpl sınıfınızın doğru paketi kullanıldı.
+        if (principal instanceof UserDetailsImpl) {
+            authenticatedUserId = ((UserDetailsImpl) principal).getId();
+        } else if (principal instanceof UserDetails) {
+            log.warn("Principal tipi UserDetailsImpl değil, standart UserDetails. Kullanıcı ID'sine doğrudan erişilemiyor. Username: {}", ((UserDetails) principal).getUsername());
+            throw new AccessDeniedException("Kullanıcı kimliği doğrulaması yapılamadı: ID'ye erişim hatası.");
+        } else {
+            log.warn("Bilinmeyen principal tipi: {}", principal.getClass().getName());
+            throw new AccessDeniedException("Erişim reddedildi: Kullanıcı doğrulanamadı.");
+        }
+        
+        if (!authenticatedUserId.equals(pathUserId)) {
+            log.warn("Erişim reddedildi: Kullanıcı ID {} (kimliği doğrulanmış) ile path ID {} eşleşmiyor.", authenticatedUserId, pathUserId);
+            throw new AccessDeniedException("Bu kaynağa erişim yetkiniz yok.");
+        }
+        log.debug("Kullanıcı ID: {} için sahip kontrolü başarılı.", pathUserId);
     }
 }

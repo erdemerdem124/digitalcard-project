@@ -1,9 +1,9 @@
 package com.soliner.digitalcard.webApi.security;
 
-import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Claims; // Bu import artık doğrudan kullanılmasa da, API'de kalabilir
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.io.Decoders; // Base64 decode için
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
@@ -15,8 +15,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey; // Key yerine SecretKey kullanıyoruz
+import com.soliner.digitalcard.application.services.impl.UserDetailsImpl;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets; // Bu import artık doğrudan kullanılmasa da, kalabilir.
 import java.util.Date;
+import java.util.function.Function; // Bu import artık doğrudan kullanılmasa da, kalabilir.
 
 /**
  * JWT (JSON Web Token) oluşturma, doğrulama ve ayrıştırma işlemleri için yardımcı sınıf.
@@ -41,25 +45,19 @@ public class JwtUtils {
      * @param authentication Kimliği doğrulanmış kullanıcı bilgilerini içeren Authentication nesnesi.
      * @return Oluşturulan JWT token'ı.
      */
-    public String generateJwtToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
-
-        String jwt = Jwts.builder()
-                .subject(userPrincipal.getUsername()) // setSubject yerine subject() kullanıldı
-                .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs)) // setExpiration yerine expiration() kullanıldı
-                .signWith(key()) // signWith metodu hala geçerli
+    public String generateToken(Authentication authentication) {
+        UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
+        
+        // KRİTİK DÜZELTME: SecretKey oluşturma yöntemini key() metodu ile aynı hale getirdik.
+        // Artık jwtSecret'in Base64 kodlu olduğu varsayılıyor.
+        SecretKey secretKey = key(); 
+        
+        return Jwts.builder()
+                .subject(userPrincipal.getUsername()) // Claims.SUBJECT yerine subject() metodu
+                .issuedAt(new Date())                // Claims.ISSUED_AT yerine issuedAt() metodu
+                .expiration(new Date((new Date()).getTime() + jwtExpirationMs)) // Claims.EXPIRATION yerine expiration() metodu
+                .signWith(secretKey) // Güncellenmiş SecretKey kullanılıyor
                 .compact();
-        logger.debug("generateJwtToken - Oluşturulan JWT: {}", jwt);
-        return jwt;
-    }
-
-    /**
-     * JWT imzalama için kullanılacak gizli anahtarı döndürür.
-     * @return Gizli anahtar (SecretKey).
-     */
-    private SecretKey key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 
     /**
@@ -70,10 +68,10 @@ public class JwtUtils {
      */
     public String getUserNameFromJwtToken(String token) {
         String username = Jwts.parser()
-                .verifyWith(key()) // Yeni metot: setSigningKey yerine verifyWith
+                .verifyWith(key())
                 .build()
-                .parseSignedClaims(token) // Yeni metot: parseClaimsJws yerine parseSignedClaims
-                .getPayload() // Yeni metot: getBody yerine getPayload
+                .parseSignedClaims(token)
+                .getPayload()
                 .getSubject();
         logger.debug("getUserNameFromJwtToken - Token'dan ayrıştırılan kullanıcı adı: {}", username);
         return username;
@@ -88,9 +86,9 @@ public class JwtUtils {
     public boolean validateJwtToken(String authToken) {
         try {
             Jwts.parser()
-                    .verifyWith(key()) // Yeni metot: setSigningKey yerine verifyWith
+                    .verifyWith(key())
                     .build()
-                    .parse(authToken); // parseSignedClaims veya parse metodu kullanılabilir
+                    .parse(authToken);
             logger.debug("validateJwtToken - JWT token geçerli ve imzası doğru.");
             return true;
         } catch (MalformedJwtException e) {
@@ -101,9 +99,19 @@ public class JwtUtils {
             logger.error("validateJwtToken - Desteklenmeyen JWT token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
             logger.error("validateJwtToken - JWT claims boş: {}", e.getMessage());
-        } catch (SignatureException e) { // İmza doğrulama hatası için yeni eklenen catch bloğu
+        } catch (SignatureException e) { // Bu hata artık daha spesifik olarak imzayı yakalar
             logger.error("validateJwtToken - JWT imza doğrulaması başarısız: {}", e.getMessage());
         }
         return false;
+    }
+
+    /**
+     * JWT imzalama için kullanılacak gizli anahtarı döndürür.
+     * Bu metod, `jwtSecret` değerini Base64 olarak çözerek SecretKey objesi oluşturur.
+     * @return Gizli anahtar (SecretKey).
+     */
+    private SecretKey key() {
+        // Bu kısım zaten Base64 decoding yapıyordu, bu haliyle korunuyor.
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
     }
 }

@@ -1,36 +1,37 @@
-package com.soliner.digitalcard.webApi.controller; // 'contoller' -> 'controller' olarak düzeltildi
+package com.soliner.digitalcard.webApi.controller;
 
-import com.soliner.digitalcard.application.services.interfaces.UserService; // UserService arayüzünü import ediyoruz
-import com.soliner.digitalcard.webApi.dto.user.UserRequest; // UserRequest DTO'yu import ediyoruz
-import com.soliner.digitalcard.webApi.dto.user.UserResponse; // UserResponse DTO'yu import ediyoruz
-import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException; // ResourceNotFoundException'ı import edin
-import com.soliner.digitalcard.domain.model.User; // Domain katmanındaki User Entity'si
-import com.soliner.digitalcard.application.mapper.UserMapper;
+import com.soliner.digitalcard.application.services.interfaces.UserService;
+import com.soliner.digitalcard.webApi.dto.auth.PasswordUpdateRequest;
+import com.soliner.digitalcard.webApi.dto.user.UserRequest;
+import com.soliner.digitalcard.webApi.dto.user.UserResponse;
+// import com.soliner.digitalcard.core.types.exceptions.ResourceNotFoundException; // Artık doğrudan fırlatıldığı için burada import'a gerek kalmayabilir.
+// import com.soliner.digitalcard.domain.model.User; // UserController'da doğrudan User Entity'si kullanılmadığı için kaldırıldı
+// import com.soliner.digitalcard.application.mapper.UserMapper; // userService doğrudan UserResponse döndürdüğü için kaldırıldı
 
-import jakarta.validation.Valid; // İstek gövdesi validasyonu için
-import org.springframework.http.HttpStatus; // HTTP durum kodları için
-import org.springframework.http.ResponseEntity; // API yanıtları için
-import org.springframework.web.bind.annotation.*; // RESTful anotasyonlar için
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional; // Optional'ı import edin
+// import java.util.Optional; // findByUsernameOrEmail metodu hala Optional döndürdüğü için kalsın.
 
 /**
  * Kullanıcılarla ilgili RESTful API endpoint'lerini yöneten Controller sınıfı.
  * Gelen HTTP isteklerini işler, servis katmanını çağırır ve DTO'lar aracılığıyla yanıt döner.
  * webApi katmanına aittir.
  */
-@RestController // Bu sınıfın bir REST Controller olduğunu belirtir
-@RequestMapping("/api/users") // Tüm endpoint'ler için temel URL yolu (örn: /api/users)
+@RestController
+@RequestMapping("/api/users")
 public class UserController {
 
-	private final UserMapper userMapper;
+    // private final UserMapper userMapper; // Artık burada doğrudan kullanılmadığı için kaldırıldı
     private final UserService userService; // Kullanıcı iş mantığı için servis katmanı
 
     // Constructor Injection ile bağımlılığı enjekte ediyoruz
-    public UserController(UserService userService, UserMapper userMapper) {
+    public UserController(UserService userService/*, UserMapper userMapper*/) { // UserMapper kaldırıldı
         this.userService = userService;
-        this.userMapper = userMapper;
+        // this.userMapper = userMapper; // Kaldırıldı
     }
 
     /**
@@ -54,12 +55,9 @@ public class UserController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        // userService.getUserById(id) artık doğrudan User nesnesi döndürüyor
-        // veya kullanıcı bulunamazsa ResourceNotFoundException fırlatıyor.
-        User user = userService.getUserById(id); // <-- .orElseThrow() kaldırıldı
-
-        // UserMapper kullanarak User entity'sini UserResponse DTO'ya dönüştürüyoruz.
-        UserResponse userResponse = userMapper.toResponse(user);
+        // KRİTİK DÜZELTME: userService.getUserById(id) zaten UserResponse döndürüyor.
+        // Bu yüzden User entity'sine dönüştürmeye gerek yok, doğrudan kullanıyoruz.
+        UserResponse userResponse = userService.getUserById(id);
         
         return ResponseEntity.ok(userResponse); // 200 OK yanıtı ile DTO'yu dön
     }
@@ -72,16 +70,12 @@ public class UserController {
      * @param username Kullanıcının kullanıcı adı (URL yolundan alınır).
      * @return Bulunan kullanıcıya ait UserResponse nesnesi ve 200 OK durumu veya bulunamazsa 404 Not Found.
      */
-    @GetMapping("/username/{username}") // <-- YENİ EKLEDİĞİMİZ ENDPOINT BU!
+    @GetMapping("/username/{username}")
     public ResponseEntity<UserResponse> getUserByUsername(@PathVariable String username) {
-        Optional<User> userOptional = userService.findByUsernameOrEmail(username); // findByUsernameOrEmail kullanıldı
-        if (userOptional.isEmpty()) {
-            throw new ResourceNotFoundException("Kullanıcı", "kullanıcı adı", username);
-        }
-
-        // Dönüştürme işlemini MapStruct üstleniyor:
-        UserResponse userResponse = userMapper.toResponse(userOptional.get());
-        System.out.println("UserController: getUserByUsername - Dönüştürülen UserResponse: " + userResponse);
+        // KRİTİK DÜZELTME: userService.getUserByUsername(username) zaten UserResponse döndürüyor.
+        // Optional<User> ve userMapper.toResponse çağrısına gerek kalmadı.
+        UserResponse userResponse = userService.getUserByUsername(username); 
+        // System.out.println("UserController: getUserByUsername - Dönüştürülen UserResponse: " + userResponse); // Debug satırını kaldırabilirsiniz
         return ResponseEntity.ok(userResponse);
     }
 
@@ -95,12 +89,8 @@ public class UserController {
      */
     @PostMapping
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRequest userRequest) {
-        // Gelen UserRequest DTO otomatik olarak valide edilir.
-        // Eğer validasyon başarısız olursa, MethodArgumentNotValidException fırlatılır
-        // ve GlobalExceptionHandler tarafından yakalanır.
-
-        UserResponse createdUser = userService.createUser(userRequest); // Servis katmanında kullanıcıyı oluştur
-        return new ResponseEntity<>(createdUser, HttpStatus.CREATED); // 201 Created yanıtı ile DTO'yu dön
+        UserResponse createdUser = userService.createUser(userRequest);
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
     /**
@@ -113,8 +103,8 @@ public class UserController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<UserResponse> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
-        UserResponse updatedUser = userService.updateUser(id, userRequest); // Servis katmanında kullanıcıyı güncelle
-        return ResponseEntity.ok(updatedUser); // 200 OK yanıtı ile DTO'yu dön
+        UserResponse updatedUser = userService.updateUser(id, userRequest);
+        return ResponseEntity.ok(updatedUser);
     }
 
     /**
@@ -125,10 +115,16 @@ public class UserController {
      * @return 204 No Content durumu.
      */
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT) // Başarılı silme durumunda 204 No Content yanıtı dönülmesini sağlar
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id); // Servis katmanında kullanıcıyı sil
-        // Servis katmanından bir istisna gelmezse (ResourceNotFoundException gibi),
-        // Spring otomatik olarak 204 No Content döner.
+        userService.deleteUser(id);
+    }
+    @PutMapping("/{id}/password") // Bu endpoint ve metot eksikti, şimdi ekliyoruz
+    public ResponseEntity<Void> updatePassword(@PathVariable Long id, @Valid @RequestBody PasswordUpdateRequest request) {
+        // UserService'deki updatePassword metodunu çağırıyoruz.
+        // Bu metodun UserService arayüzünüzde ve implementasyonunuzda mevcut olduğundan emin olun.
+        userService.updatePassword(id, request);
+        // Şifre güncellendiğinde genellikle bir içerik döndürmeyiz, sadece başarılı olduğunu belirtiriz.
+        return ResponseEntity.ok().build(); // 200 OK yanıtı
     }
 }

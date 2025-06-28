@@ -1,5 +1,6 @@
 /* src/app/components/home/home.component.scss */
 
+/* Genel Konteyner Stilimiz */
 .main-container {
   display: flex;
   flex-direction: column;
@@ -499,6 +500,30 @@ input:checked + .slider:before {
   }
 }
 
+/* YENİ EKLENTİ: Proje Görseli Konteyner ve Resim Stilleri */
+.project-image-display-container {
+    width: 100%; /* Kartın tam genişliğini kapla */
+    height: 220px; /* Yüksekliği daha da artırıldı */
+    overflow: hidden;
+    margin-bottom: 15px;
+    border-radius: 10px; /* Hafif yuvarlak köşeler */
+    background-color: var(--background-color); /* Boş arka plan rengi */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 8px var(--shadow-color); /* Gölge */
+    border: 1px solid var(--border-color); /* Kenarlık */
+
+    .project-display-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Resmi kutuya sığdırır ve kırpar */
+        border-radius: 10px; /* Ebeveynle aynı yuvarlak köşeler */
+    }
+}
+
+
+/* QR Kodu Bölümü */
 .qrcode-display {
   display: flex;
   justify-content: center;

@@ -2,10 +2,13 @@ package com.soliner.digitalcard.persistence.repository;
 
 
 import com.soliner.digitalcard.domain.model.Project; // Project Entity'sini import ediyoruz
+import com.soliner.digitalcard.domain.model.User;
+
 import org.springframework.data.jpa.repository.JpaRepository; // Spring Data JPA'nın temel Repository arayüzünü import ediyoruz
 import org.springframework.stereotype.Repository; // İsteğe bağlı ama iyi uygulama için eklenir
 
 import java.util.List; // findByUserId metodu için
+import java.util.Optional;
 
 /**
  * Proje (Project) Entity'si için veri erişim işlemlerini sağlayan Repository arayüzü.
@@ -22,6 +25,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @param userId Projelerin ait olduğu kullanıcının ID'si.
      * @return Belirtilen kullanıcıya ait Project listesi.
      */
-    List<Project> findByUser_Id(Long userId); // <-- Burası düzeltildi!
+    List<Project> findByUserId(Long userId); // KRİTİK DÜZELTME: findByUser_Id yerine findByUserId kullanıldı
+    
+    Optional<Project> findByUserAndTitle(User user, String title);
+
 }
 
